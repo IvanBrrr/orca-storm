@@ -604,7 +604,9 @@ module.exports = {
       'xdotool',
       'xclip',
       'xvfb'
-    ]
+    ],
+    afterInstall: 'resources/linux/packaging/after-install.sh',
+    afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
   rpm: {
     packageName: 'orca-storm',
@@ -618,7 +620,9 @@ module.exports = {
       'xdotool',
       'xclip',
       'xorg-x11-server-Xvfb'
-    ]
+    ],
+    afterInstall: 'resources/linux/packaging/after-install.sh',
+    afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
   beforeBuild: electronBuilderNativeRebuild,
   // Why: must be true so that electron-builder rebuilds native modules

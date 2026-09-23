@@ -97,9 +97,9 @@ jobs:
             pnpm install --frozen-lockfile
           fi
       - uses: ./.github/actions/install-mobile-dependencies
-      - name: Install RPM packager
+      - name: Install Linux build dependencies
         if: matrix.target == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm
+        run: sudo apt-get update && sudo apt-get install -y cpio rpm python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool
       - name: Build Windows process table addon
         if: matrix.target == 'win'
         shell: bash
