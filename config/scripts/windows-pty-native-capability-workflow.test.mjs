@@ -17,7 +17,7 @@ describe('packaged Windows PTY native capability routing', () => {
     expect(job['runs-on']).toBe('windows-2022')
     expect(smokeIndex).toBe(packageIndex + 1)
     expect(smoke.run).toBe(
-      'pnpm run smoke:windows-pty-native-capability -- --exe=dist/win-unpacked/Orca.exe'
+      'pnpm run smoke:windows-pty-native-capability -- --exe="dist/win-unpacked/Orca Storm.exe"'
     )
     expect(smoke.if).toBeUndefined()
     expect(smoke['continue-on-error']).toBeUndefined()

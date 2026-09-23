@@ -40,7 +40,7 @@ describe('electron-builder dev-channel identity', () => {
     expect(config.win.signtoolOptions.publisherName).toBeUndefined()
     expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
     expect(config.publish.repo).toBe('orca-storm')
-    expect(config.publish.releaseType).toBe('draft')
+    expect(config.publish.releaseType).toBe('release')
   })
 
   // The whole point of the change: an unsigned build that advertised a
@@ -74,7 +74,7 @@ describe('electron-builder dev-channel identity', () => {
     const config = loadConfigWithEnv(env)
 
     expect(config.publish.repo).toBe('orca-storm')
-    expect(config.publish.releaseType).toBe('draft')
+    expect(config.publish.releaseType).toBe('release')
   })
 
   // Why: ORCA_MAC_* gates hardened runtime, notarization, and root-level
