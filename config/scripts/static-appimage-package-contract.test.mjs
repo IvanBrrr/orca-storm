@@ -16,7 +16,9 @@ const FIXTURE_BYTES = 384
 describe('static AppImage package contract', () => {
   it.each([
     ['orca-linux.AppImage', 0x3e, 1],
-    ['orca-linux-arm64.AppImage', 0xb7, 'arm64']
+    ['orca-linux-arm64.AppImage', 0xb7, 'arm64'],
+    ['orca-storm-linux.AppImage', 0x3e, 1],
+    ['orca-storm-linux-arm64.AppImage', 0xb7, 'arm64']
   ])('accepts a dependency-free type-2 %s runtime', async (filename, machine, targetArch) => {
     await withFixture(filename, createRuntime({ machine }), (path) => {
       expect(() => verifyStaticAppImagePackage(path, targetArch)).not.toThrow()
@@ -29,7 +31,14 @@ describe('static AppImage package contract', () => {
     ['generic x64 runtime for an arm64 target', 'orca-linux.AppImage', 0x3e, 3],
     ['generic arm64 runtime for an x64 target', 'orca-linux.AppImage', 0xb7, 1],
     ['arm64 artifact filename for an x64 target', 'orca-linux-arm64.AppImage', 0xb7, 1],
-    ['x64 runtime under an arm64 artifact filename', 'orca-linux-arm64.AppImage', 0x3e, 3]
+    ['x64 runtime under an arm64 artifact filename', 'orca-linux-arm64.AppImage', 0x3e, 3],
+    [
+      'storm arm64 filename for an x64 runtime and target',
+      'orca-storm-linux-arm64.AppImage',
+      0x3e,
+      1
+    ],
+    ['storm x64 filename for an arm64 runtime and target', 'orca-storm-linux.AppImage', 0xb7, 3]
   ])('rejects %s', async (_label, filename, machine, targetArch) => {
     await withFixture(filename, createRuntime({ machine }), (path) => {
       expect(() => verifyStaticAppImagePackage(path, targetArch)).toThrow(/architecture|target/)

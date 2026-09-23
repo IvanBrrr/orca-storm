@@ -119,8 +119,7 @@ jobs:
             export ORCA_STORM_MAC_SIGNED=1
             echo "ORCA_STORM_MAC_SIGNED=1" >> "$GITHUB_ENV"
           elif [[ "${{ matrix.target }}" == mac ]]; then
-            export CSC_LINK=''
-            export CSC_KEY_PASSWORD=''
+            unset CSC_LINK CSC_KEY_PASSWORD
             export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
           pnpm run ensure:electron-runtime
