@@ -66,3 +66,17 @@ it('shares sessions while preserving each edition settings across alternating la
   )
   stormAgain.freezeWrites()
 })
+
+it('persists Storm settings through the asynchronous flush path', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'orca-storm-async-settings-'))
+  dirs.push(dir)
+  const dataFile = join(dir, 'orca-data.json')
+  const storm = new Store({ dataFile, stormSettingsOverlay: true })
+  storm.updateSettings({ theme: 'dark' })
+  await storm.flushAsync()
+
+  expect(JSON.parse(readFileSync(join(dir, 'orca-storm-settings.json'), 'utf-8')).theme).toBe(
+    'dark'
+  )
+  expect(new Store({ dataFile, stormSettingsOverlay: true }).getSettings().theme).toBe('dark')
+})

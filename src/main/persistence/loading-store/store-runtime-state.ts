@@ -75,7 +75,7 @@ export class StoreRuntimeState {
 
   constructor(options: StoreRuntimeOptions = {}) {
     this.dataFile = options.dataFile ?? getDataFile()
-    this.stormSettingsOverlay = options.stormSettingsOverlay ?? options.dataFile === undefined
+    this.stormSettingsOverlay = options.stormSettingsOverlay ?? false
     this.storageAuthority = options.storageAuthority ?? 'desktop'
     this.staleTempCleanup = removeStaleDurableWriteTempFiles(this.dataFile, {
       minimumAgeMs: STALE_DURABLE_WRITE_TEMP_AGE_MS

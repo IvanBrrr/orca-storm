@@ -1,5 +1,5 @@
-import { net, session } from 'electron'
 import { isPlaneJsonRecord } from '../../shared/plane-json-record'
+import { getMainHttpClient } from '../network/http-client'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 import { withSpan } from '../observability/tracer'
 import type { PlaneWorkspace } from '../../shared/plane-types'
@@ -64,8 +64,10 @@ async function planeFetch(url: string, init: RequestInit): Promise<Response> {
     'plane.request',
     async (span) => {
       span.setAttribute('plane.origin', new URL(url).origin)
+      const httpClient = getMainHttpClient()
+      const proxySession = httpClient.proxySession()
       await ensureElectronProxyFromEnvironment({
-        proxySession: session.defaultSession,
+        ...(proxySession ? { proxySession } : {}),
         probeUrl: url
       }).catch((error) => {
         span.addEvent('plane.proxySetupFailed', {
@@ -76,7 +78,7 @@ async function planeFetch(url: string, init: RequestInit): Promise<Response> {
       try {
         // Why: Electron's network stack follows Chromium proxy/session state,
         // avoiding undici's stale keep-alive sockets after VPN path changes.
-        return await net.fetch(url, init)
+        return await httpClient.fetch(url, init)
       } catch (error) {
         span.setAttribute(
           'plane.transportErrorName',

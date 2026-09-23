@@ -9,7 +9,6 @@ import {
 import { stripRetiredGlobalSettings } from '../applying-settings/terminal-settings-migrations'
 import { omitDefaultWorktreeMetaFieldsInMap } from '../../../shared/worktree/meta-persisted-defaults'
 import { projectWorktreeMetaByIdentityOntoLocators } from './worktree-meta-alias-projection'
-import { writeStormSettings } from './storm-settings-overlay'
 import { withoutRedundantPartitionGlobals } from '../../../shared/workspace-session-host-field-ownership'
 
 import {
@@ -21,7 +20,6 @@ import type { StoreRuntimeState } from './store-runtime-state'
 type StateSerializationSecretHandlingOperationsRuntime = Pick<
   StoreRuntimeState,
   | 'canonicalSettingsRaw'
-  | 'dataFile'
   | 'lastStormSettingsHash'
   | 'protectedSecrets'
   | 'state'
@@ -40,6 +38,7 @@ export class StateSerializationSecretHandlingOperations {
     payload: Buffer
     stateHash: string
     protectedSecretUpdates: ProtectedSecretRetentionUpdate[]
+    stormSettings?: { payload: Buffer; stateHash: string }
   } {
     // Why sentinels (not a blob/key string match): the substitution must be
     // position-exact. A plain search for the ciphertext — or even for a
@@ -147,17 +146,13 @@ export class StateSerializationSecretHandlingOperations {
         )
       }
     }
-    if (this.runtime.stormSettingsOverlay) {
-      const settingsPayload = applySecretSentinelSubstitutions(
-        JSON.stringify(stateToSave.settings),
-        secretSubs,
-        protectedStorageDegraded ? 'safeStorage-degraded\0' : ''
-      )
-      if (settingsPayload.stateHash !== this.runtime.lastStormSettingsHash) {
-        writeStormSettings(this.runtime.dataFile, settingsPayload.payload)
-        this.runtime.lastStormSettingsHash = settingsPayload.stateHash
-      }
-    }
+    const settingsPayload = this.runtime.stormSettingsOverlay
+      ? applySecretSentinelSubstitutions(
+          JSON.stringify(stateToSave.settings),
+          secretSubs,
+          protectedStorageDegraded ? 'safeStorage-degraded\0' : ''
+        )
+      : null
     // Why compact: ~20% fewer bytes and less serialize time; all readers JSON.parse so formatting is irrelevant.
     // One full-state stringify; secret slots currently hold sentinels.
     const serialized = JSON.stringify(
@@ -173,6 +168,13 @@ export class StateSerializationSecretHandlingOperations {
       secretSubs,
       protectedStorageDegraded ? 'safeStorage-degraded\0' : ''
     )
-    return { payload, stateHash, protectedSecretUpdates }
+    return {
+      payload,
+      stateHash,
+      protectedSecretUpdates,
+      ...(settingsPayload && settingsPayload.stateHash !== this.runtime.lastStormSettingsHash
+        ? { stormSettings: settingsPayload }
+        : {})
+    }
   }
 }

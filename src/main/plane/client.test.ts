@@ -44,6 +44,12 @@ async function loadPlaneModules() {
       defaultSession: { resolveProxy: resolveProxyMock, setProxy: setProxyMock }
     }
   }))
+  vi.doMock('../network/http-client', () => ({
+    getMainHttpClient: () => ({
+      fetch: netFetchMock,
+      proxySession: () => ({ resolveProxy: resolveProxyMock, setProxy: setProxyMock })
+    })
+  }))
   // Both specifiers are mocked deliberately: the credential store imports
   // `node:os`, and relying on one specifier resolving to the other would put
   // real credentials under the developer's home directory if that ever changed.

@@ -637,7 +637,7 @@ module.exports = {
     owner: 'IvanBrrr',
     repo: 'orca-storm',
     // The Storm workflow publishes only after all platform artifacts are ready.
-    releaseType: 'release'
+    releaseType: 'draft'
   }
 }
 

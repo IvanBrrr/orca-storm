@@ -272,7 +272,7 @@ describe('feature interaction writer boundaries', () => {
       sourceBetween(
         componentSource('use-task-page-composer-actions.ts'),
         'const handleUseJiraItem',
-        'const nextModel'
+        'const handleUsePlaneItem'
       )
     ).toContain(jiraWriter)
   })

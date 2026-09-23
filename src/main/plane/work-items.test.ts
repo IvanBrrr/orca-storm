@@ -50,6 +50,12 @@ async function loadWorkItems() {
     safeStorage: { isEncryptionAvailable: () => false },
     session: { defaultSession: { resolveProxy: resolveProxyMock, setProxy: setProxyMock } }
   }))
+  vi.doMock('../network/http-client', () => ({
+    getMainHttpClient: () => ({
+      fetch: netFetchMock,
+      proxySession: () => ({ resolveProxy: resolveProxyMock, setProxy: setProxyMock })
+    })
+  }))
   vi.doMock('os', async () => {
     const actual = await vi.importActual<typeof Os>('os')
     return { ...actual, homedir: () => tempHome }
