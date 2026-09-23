@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { LinearWorkspaceSelection } from '../../../shared/linear/workspace-types'
 import type { JiraIssue } from '../../../shared/jira-types'
+import type { PlaneWorkItem } from '../../../shared/plane-types'
 import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
 import { useAppStore } from '@/store'
@@ -10,9 +11,13 @@ import { openLinearIssueWorkspaceOrStart } from '@/lib/linear-issue-workspace-op
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { bindTaskPageJiraItemSourceContext } from './task-page-jira-item-source-context'
+import { bindTaskPagePlaneItemSourceContext } from './task-page-plane-item-source-context'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldHideTaskPageListChrome } from '@/components/task-page-list-chrome-visibility'
-import { getJiraIssueWorkspaceSeed } from './task-page-source-context'
+import {
+  getJiraIssueWorkspaceSeed,
+  getPlaneWorkItemWorkspaceSeed
+} from './task-page-source-context'
 export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) {
   const {
     setTaskResumeState,
@@ -26,6 +31,8 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     taskSource,
     linearTaskSourceContext,
     jiraTaskSourceContext,
+    accountBackedTaskSourceHostId,
+    fallbackTaskSourceProjectId,
     gitlabDialogItem,
     dialogWorkItem,
     selectedLinearIssue,
@@ -228,6 +235,32 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     },
     [openComposerForJiraItem]
   )
+  const handleUsePlaneItem = useCallback(
+    (item: PlaneWorkItem): void => {
+      const linkedWorkItem: LinkedWorkItemSummary = {
+        type: 'issue',
+        provider: 'plane',
+        number: item.sequenceId,
+        title: `${item.key} ${item.title}`,
+        url: item.url,
+        planeIdentifier: item.key
+      }
+      // Why: two Plane deployments can own the same PROJ-123, so the workspace
+      // and project identity travel with the link.
+      const taskSourceContext = bindTaskPagePlaneItemSourceContext({
+        item,
+        hostId: accountBackedTaskSourceHostId,
+        projectId: fallbackTaskSourceProjectId
+      })
+      openModal('new-workspace-composer', {
+        linkedWorkItem,
+        ...(taskSourceContext ? { taskSourceContext } : {}),
+        prefilledName: getPlaneWorkItemWorkspaceSeed(item),
+        telemetrySource: 'sidebar'
+      })
+    },
+    [accountBackedTaskSourceHostId, fallbackTaskSourceProjectId, openModal]
+  )
   const taskPageListChromeHidden = shouldHideTaskPageListChrome({
     taskSource,
     hasGitHubDetail: Boolean(dialogWorkItem),
@@ -237,28 +270,19 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     hasLinearProjectContext: Boolean(selectedLinearProject),
     hasLinearViewContext: Boolean(selectedLinearCustomView)
   })
-  const nextModel = model as typeof model & {
-    openComposerForLinearItem: typeof openComposerForLinearItem
-    handleUseLinearItem: typeof handleUseLinearItem
-    handleOpenOrUseLinearItem: typeof handleOpenOrUseLinearItem
-    handleLinearWorkspaceChange: typeof handleLinearWorkspaceChange
-    handleLinearTeamSelectionChange: typeof handleLinearTeamSelectionChange
-    handleLinearScopeOpen: typeof handleLinearScopeOpen
-    handleLinearAccessConnected: typeof handleLinearAccessConnected
-    openComposerForJiraItem: typeof openComposerForJiraItem
-    handleUseJiraItem: typeof handleUseJiraItem
-    taskPageListChromeHidden: typeof taskPageListChromeHidden
+  return {
+    ...model,
+    openComposerForLinearItem,
+    handleUseLinearItem,
+    handleOpenOrUseLinearItem,
+    handleLinearWorkspaceChange,
+    handleLinearTeamSelectionChange,
+    handleLinearScopeOpen,
+    handleLinearAccessConnected,
+    openComposerForJiraItem,
+    handleUseJiraItem,
+    handleUsePlaneItem,
+    taskPageListChromeHidden
   }
-  nextModel.openComposerForLinearItem = openComposerForLinearItem
-  nextModel.handleUseLinearItem = handleUseLinearItem
-  nextModel.handleOpenOrUseLinearItem = handleOpenOrUseLinearItem
-  nextModel.handleLinearWorkspaceChange = handleLinearWorkspaceChange
-  nextModel.handleLinearTeamSelectionChange = handleLinearTeamSelectionChange
-  nextModel.handleLinearScopeOpen = handleLinearScopeOpen
-  nextModel.handleLinearAccessConnected = handleLinearAccessConnected
-  nextModel.openComposerForJiraItem = openComposerForJiraItem
-  nextModel.handleUseJiraItem = handleUseJiraItem
-  nextModel.taskPageListChromeHidden = taskPageListChromeHidden
-  return nextModel
 }
 export type TaskPageComposerActionsModel = ReturnType<typeof useTaskPageComposerActions>
