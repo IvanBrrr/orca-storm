@@ -209,6 +209,11 @@ export function configureDevUserDataPath(isDev: boolean): void {
   }
 
   if (!isDev) {
+    if (app.isPackaged) {
+      // Both installed editions open the same worktree and session profile in turn.
+      app.setPath('userData', join(app.getPath('appData'), 'orca'))
+      process.env.ORCA_CLI_COMMAND = 'orca-storm'
+    }
     return
   }
   const overrideUserDataPath = process.env.ORCA_DEV_USER_DATA_PATH

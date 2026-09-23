@@ -1,0 +1,172 @@
+name: Orca Storm build
+
+on:
+  push:
+    branches: [main, orca-storm-plane]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storm-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  identity:
+    if: github.repository == 'IvanBrrr/orca-storm'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: ${{ github.event_name == 'schedule' }}
+      - name: Merge upstream main
+        if: github.event_name == 'schedule'
+        shell: bash
+        run: |
+          git config user.name 'orca-storm-bot'
+          git config user.email 'orca-storm-bot@users.noreply.github.com'
+          git remote add upstream https://github.com/stablyai/orca.git
+          git fetch --no-tags upstream main
+          git merge --no-edit upstream/main
+          git push origin HEAD:main
+      - id: version
+        shell: bash
+        run: |
+          base="$(node -p 'require("./package.json").version.split("-")[0]')"
+          version="${base}-storm.${GITHUB_RUN_NUMBER}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: identity
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: mac
+            artifact: mac
+          - os: windows-2022
+            target: win
+            artifact: windows
+          - os: ubuntu-22.04
+            target: linux
+            artifact: linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      ORCA_STORM_BUILD_VERSION: ${{ needs.identity.outputs.version }}
+      ORCA_BUILD_COMMIT: ${{ needs.identity.outputs.source_sha }}
+      CSC_LINK: ${{ secrets.STORM_MAC_CERTS }}
+      CSC_KEY_PASSWORD: ${{ secrets.STORM_MAC_CERTS_PASSWORD }}
+      APPLE_ID: ${{ secrets.STORM_APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.STORM_APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.STORM_APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.identity.outputs.source_sha }}
+          persist-credentials: false
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == mac ]]; then
+            pnpm install:release
+          else
+            pnpm install --frozen-lockfile
+          fi
+      - uses: ./.github/actions/install-mobile-dependencies
+      - name: Install RPM packager
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Build Windows process table addon
+        if: matrix.target == 'win'
+        shell: bash
+        run: |
+          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=x64
+          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=arm64
+      - name: Typecheck
+        run: pnpm tc
+      - name: Build
+        run: pnpm build:release
+        env:
+          ORCA_REQUIRE_RELAY_NATIVE_ADDONS: ${{ matrix.target == 'win' && 'x64,arm64' || '' }}
+      - name: Package
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == mac && -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+            export ORCA_STORM_MAC_SIGNED=1
+            echo "ORCA_STORM_MAC_SIGNED=1" >> "$GITHUB_ENV"
+          elif [[ "${{ matrix.target }}" == mac ]]; then
+            export CSC_LINK=''
+            export CSC_KEY_PASSWORD=''
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          pnpm run ensure:electron-runtime
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --${{ matrix.target }} --publish never
+      - name: Remove unsigned macOS update files
+        if: matrix.target == 'mac'
+        shell: bash
+        run: |
+          if [[ "${ORCA_STORM_MAC_SIGNED:-}" != 1 ]]; then
+            find dist -maxdepth 1 -type f \( -name 'latest-mac.yml' -o -name '*.zip' -o -name '*.zip.blockmap' \) -delete
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storm-${{ matrix.artifact }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/latest*.yml
+            dist/*.blockmap
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: [identity, package]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: storm-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.identity.outputs.tag }}
+          SOURCE_SHA: ${{ needs.identity.outputs.source_sha }}
+        run: |
+          mapfile -d '' assets < <(find release-assets -maxdepth 1 -type f -print0)
+          test "${#assets[@]}" -gt 0
+          gh release create "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" --latest --title "Orca Storm $TAG" \
+            --notes "Orca Storm build from $SOURCE_SHA."

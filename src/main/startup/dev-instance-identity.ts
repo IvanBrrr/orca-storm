@@ -4,6 +4,8 @@ import type { AppIdentity } from '../../shared/app-identity'
 
 const BASE_APP_NAME = 'Orca'
 const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
+const STORM_APP_NAME = 'Orca Storm'
+const STORM_APP_USER_MODEL_ID = 'com.ivanbrrr.orcastorm'
 const MAX_LABEL_LENGTH = 80
 
 export type DevInstanceIdentity = AppIdentity & {
@@ -67,15 +69,15 @@ export function getDevInstanceIdentity(
 ): DevInstanceIdentity {
   if (!isDev) {
     return {
-      name: BASE_APP_NAME,
-      appName: BASE_APP_NAME,
+      name: STORM_APP_NAME,
+      appName: STORM_APP_NAME,
       isDev: false,
       devLabel: null,
       devBranch: null,
       devWorktreeName: null,
       devRepoRoot: null,
       dockBadgeLabel: null,
-      appUserModelId: BASE_APP_USER_MODEL_ID
+      appUserModelId: STORM_APP_USER_MODEL_ID
     }
   }
 

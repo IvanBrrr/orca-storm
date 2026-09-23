@@ -9,6 +9,7 @@ import {
 import { stripRetiredGlobalSettings } from '../applying-settings/terminal-settings-migrations'
 import { omitDefaultWorktreeMetaFieldsInMap } from '../../../shared/worktree/meta-persisted-defaults'
 import { projectWorktreeMetaByIdentityOntoLocators } from './worktree-meta-alias-projection'
+import { writeStormSettings } from './storm-settings-overlay'
 import { withoutRedundantPartitionGlobals } from '../../../shared/workspace-session-host-field-ownership'
 
 import {
@@ -19,7 +20,12 @@ import type { StoreRuntimeState } from './store-runtime-state'
 
 type StateSerializationSecretHandlingOperationsRuntime = Pick<
   StoreRuntimeState,
-  'protectedSecrets' | 'state'
+  | 'canonicalSettingsRaw'
+  | 'dataFile'
+  | 'lastStormSettingsHash'
+  | 'protectedSecrets'
+  | 'state'
+  | 'stormSettingsOverlay'
 >
 
 export class StateSerializationSecretHandlingOperations {
@@ -141,9 +147,24 @@ export class StateSerializationSecretHandlingOperations {
         )
       }
     }
+    if (this.runtime.stormSettingsOverlay) {
+      const settingsPayload = applySecretSentinelSubstitutions(
+        JSON.stringify(stateToSave.settings),
+        secretSubs,
+        protectedStorageDegraded ? 'safeStorage-degraded\0' : ''
+      )
+      if (settingsPayload.stateHash !== this.runtime.lastStormSettingsHash) {
+        writeStormSettings(this.runtime.dataFile, settingsPayload.payload)
+        this.runtime.lastStormSettingsHash = settingsPayload.stateHash
+      }
+    }
     // Why compact: ~20% fewer bytes and less serialize time; all readers JSON.parse so formatting is irrelevant.
     // One full-state stringify; secret slots currently hold sentinels.
-    const serialized = JSON.stringify(stateToSave)
+    const serialized = JSON.stringify(
+      this.runtime.stormSettingsOverlay
+        ? { ...stateToSave, settings: this.runtime.canonicalSettingsRaw ?? stateToSave.settings }
+        : stateToSave
+    )
     // Substitute each unique sentinel: ciphertext for the on-disk payload, a stable normalized
     // value for the guard hash. One pass builds both, so the multi-MB state is never copied per
     // sentinel and never encoded twice.

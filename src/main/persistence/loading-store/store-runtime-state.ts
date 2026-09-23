@@ -23,12 +23,16 @@ import type {
 export type StoreRuntimeOptions = {
   dataFile?: string
   storageAuthority?: AutomationStorageAuthority
+  stormSettingsOverlay?: boolean
 }
 
 /** Mutable coordination state shared only with this Store's private collaborators. */
 export class StoreRuntimeState {
   state!: PersistedState
   readonly dataFile: string
+  readonly stormSettingsOverlay: boolean
+  canonicalSettingsRaw: GlobalSettings | null = null
+  lastStormSettingsHash: string | null = null
   readonly storageAuthority: AutomationStorageAuthority
   automationListProjectionCache: AutomationListProjectionCache | null = null
   activeViewPreference!: ActiveViewPreference
@@ -71,6 +75,7 @@ export class StoreRuntimeState {
 
   constructor(options: StoreRuntimeOptions = {}) {
     this.dataFile = options.dataFile ?? getDataFile()
+    this.stormSettingsOverlay = options.stormSettingsOverlay ?? options.dataFile === undefined
     this.storageAuthority = options.storageAuthority ?? 'desktop'
     this.staleTempCleanup = removeStaleDurableWriteTempFiles(this.dataFile, {
       minimumAgeMs: STALE_DURABLE_WRITE_TEMP_AGE_MS

@@ -19,7 +19,7 @@ export async function makeFixture(): Promise<{
 export async function createPackagedMacLauncher(root: string): Promise<string> {
   const resourcesPath = join(root, 'resources')
   await mkdir(join(resourcesPath, 'bin'), { recursive: true })
-  await writeFile(join(resourcesPath, 'bin', 'orca'), '#!/usr/bin/env bash\necho orca\n', {
+  await writeFile(join(resourcesPath, 'bin', 'orca-storm'), '#!/usr/bin/env bash\necho orca\n', {
     encoding: 'utf8',
     mode: 0o755
   })

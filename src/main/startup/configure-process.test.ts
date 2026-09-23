@@ -3,6 +3,8 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+const originalCliCommand = process.env.ORCA_CLI_COMMAND
+
 vi.mock('electron', () => {
   const paths = new Map<string, string>([['appData', '/tmp/app-data']])
   return {
@@ -26,6 +28,7 @@ vi.mock('electron', () => {
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
+  restoreEnv('ORCA_CLI_COMMAND', originalCliCommand)
 })
 
 describe('patchPackagedProcessPath', () => {
@@ -352,14 +355,16 @@ describe('configureDevUserDataPath', () => {
     expect(app.setPath).toHaveBeenCalledWith('userData', join('/tmp/app-data', 'orca-dev'))
   })
 
-  it('leaves packaged runs on the default userData path', async () => {
+  it('points packaged Storm at the official profile', async () => {
     const { app } = await import('electron')
     const { configureDevUserDataPath } = await import('./configure-process')
 
     vi.mocked(app.setPath).mockClear()
+    Object.defineProperty(app, 'isPackaged', { configurable: true, value: true })
     configureDevUserDataPath(false)
 
-    expect(app.setPath).not.toHaveBeenCalled()
+    expect(app.setPath).toHaveBeenCalledWith('userData', join('/tmp/app-data', 'orca'))
+    expect(process.env.ORCA_CLI_COMMAND).toBe('orca-storm')
   })
 })
 

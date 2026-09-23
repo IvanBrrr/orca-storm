@@ -24,7 +24,7 @@ import { getBundledLauncherPath } from './bundled-cli-launcher-path'
 import { buildBareOrcaCliScript } from './linux-bare-orca-dispatcher'
 import { quoteShell } from './cli-install-path-format'
 
-const SHIM_DIR_NAME = 'linux-orca-cli-shim'
+const SHIM_DIR_NAME = 'linux-orca-storm-cli-shim'
 
 export type LinuxTerminalOrcaCliShimOptions = {
   userDataPath: string
