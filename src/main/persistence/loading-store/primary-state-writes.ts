@@ -2,6 +2,7 @@ import { mkdirSync, existsSync, unlinkSync } from 'node:fs'
 import { mkdir, open, rm } from 'node:fs/promises'
 import { durableWriteTempPath, renameDurable, writeFileDurableSync } from '../../durable-file-write'
 import { dirname } from 'node:path'
+import { writeStormSettingsIfCurrent, writeStormSettingsSync } from './storm-settings-overlay'
 import {
   parseCodexResetCreditAttemptLedger,
   type CodexResetCreditAttemptLedger
@@ -20,6 +21,7 @@ type PrimaryStateWriteOperationsRuntime = Pick<
   | 'firstPendingSaveAt'
   | 'inFlightAsyncTmpFile'
   | 'lastDurableWriteGeneration'
+  | 'lastStormSettingsHash'
   | 'lastWrittenStateHash'
   | 'pendingSnapshotFileWork'
   | 'pendingWrite'
@@ -140,8 +142,20 @@ export async function writeToDiskAsync(owner: PrimaryStateWriteOperations): Prom
     return
   }
   const gen = owner[primaryStateWriteOperationsContext].runtime.writeGeneration
-  const { payload, stateHash, protectedSecretUpdates } =
+  const { payload, stateHash, protectedSecretUpdates, stormSettings } =
     owner[primaryStateWriteOperationsContext].serialization.buildStateToSave()
+  if (stormSettings) {
+    const runtime = owner[primaryStateWriteOperationsContext].runtime
+    const written = await writeStormSettingsIfCurrent(
+      runtime.dataFile,
+      stormSettings.payload,
+      () => runtime.writeGeneration === gen
+    )
+    if (!written) {
+      return
+    }
+    runtime.lastStormSettingsHash = stormSettings.stateHash
+  }
   // Why: don't rewrite a byte-identical multi-MB file when state nets out to already-persisted.
   if (stateHash === owner[primaryStateWriteOperationsContext].runtime.lastWrittenStateHash) {
     owner[primaryStateWriteOperationsContext].runtime.lastDurableWriteGeneration = Math.max(
@@ -224,8 +238,13 @@ export function writeToDiskSync(
   if (owner[primaryStateWriteOperationsContext].runtime.writesFrozen) {
     return
   }
-  const { payload, stateHash, protectedSecretUpdates } =
+  const { payload, stateHash, protectedSecretUpdates, stormSettings } =
     owner[primaryStateWriteOperationsContext].serialization.buildStateToSave()
+  if (stormSettings) {
+    const runtime = owner[primaryStateWriteOperationsContext].runtime
+    writeStormSettingsSync(runtime.dataFile, stormSettings.payload)
+    runtime.lastStormSettingsHash = stormSettings.stateHash
+  }
   // Why: matching hash means the file already holds this state; force overrides when an async rename may be racing past the gen check.
   if (
     !opts.force &&

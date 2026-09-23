@@ -3,7 +3,7 @@ const BRIDGE_MANAGED_MARKER = '# Orca managed WSL CLI PowerShell bridge'
 
 export function buildWslLauncher(
   windowsLauncherPath: string,
-  bridgePath = '${XDG_DATA_HOME:-$HOME/.local/share}/orca/orca-wsl-bridge.ps1'
+  bridgePath = '${XDG_DATA_HOME:-$HOME/.local/share}/orca-storm/orca-wsl-bridge.ps1'
 ): string {
   const encodedTarget = Buffer.from(windowsLauncherPath, 'utf8').toString('base64')
   return `#!/usr/bin/env bash
@@ -120,9 +120,8 @@ exit $exitCode
 }
 
 export function getBridgePathFromCommandPath(commandPath: string): string {
-  // Why: both the current Linux command and the legacy pre-rename command
-  // share one WSL bridge under ~/.local/share/orca.
-  return `${commandPath.replace(/\/\.local\/bin\/(?:orca|orca-ide)$/, '/.local/share/orca')}/orca-wsl-bridge.ps1`
+  // Keep the Storm bridge clear of the official Orca WSL bridge.
+  return `${commandPath.replace(/\/\.local\/bin\/orca-storm$/, '/.local/share/orca-storm')}/orca-wsl-bridge.ps1`
 }
 
 export function buildSafeReplaceGuard(path: string, managedMarker: string): string {

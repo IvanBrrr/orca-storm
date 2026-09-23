@@ -34,13 +34,13 @@ afterEach(() => {
 })
 
 describe('electron-builder dev-channel identity', () => {
-  it('keeps the SignPath publisherName on stable Windows builds', () => {
+  it('keeps unsigned Windows builds pointed at the Storm repository', () => {
     const config = loadConfigWithEnv({})
 
-    expect(config.win.signtoolOptions.publisherName).toBe('SignPath Foundation')
+    expect(config.win.signtoolOptions.publisherName).toBeUndefined()
     expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
-    expect(config.publish.repo).toBe('orca')
-    expect(config.publish.releaseType).toBe('draft')
+    expect(config.publish.repo).toBe('orca-storm')
+    expect(config.publish.releaseType).toBe('release')
   })
 
   // The whole point of the change: an unsigned build that advertised a
@@ -50,7 +50,7 @@ describe('electron-builder dev-channel identity', () => {
     const config = loadConfigWithEnv(WIN_ADHOC_ENV)
 
     expect(config.win.signtoolOptions?.publisherName).toBeUndefined()
-    expect(config.win.verifyUpdateCodeSignature).toBe(false)
+    expect(config.win.verifyUpdateCodeSignature).toBeUndefined()
   })
 
   // Why on every channel: the hook is the only handle electron-builder gives on
@@ -62,19 +62,19 @@ describe('electron-builder dev-channel identity', () => {
       const config = loadConfigWithEnv(env)
       expect(typeof config.win.signtoolOptions.sign).toBe('function')
     }
-    expect(loadConfigWithEnv({}).win.signtoolOptions.publisherName).toBe('SignPath Foundation')
+    expect(loadConfigWithEnv({}).win.signtoolOptions.publisherName).toBeUndefined()
     expect(loadConfigWithEnv(WIN_ADHOC_ENV).win.signtoolOptions.publisherName).toBeUndefined()
   })
 
   it.each([
-    ['hourly', { ORCA_WIN_HOURLY: '1' }, 'orca-hourly'],
-    ['daily', { ORCA_WIN_DAILY: '1' }, 'orca-daily'],
-    ['adhoc', { ORCA_WIN_ADHOC: '1' }, 'orca-adhoc']
-  ])('publishes %s Windows builds to its own repo as a prerelease', (_channel, env, repo) => {
+    ['hourly', { ORCA_WIN_HOURLY: '1' }],
+    ['daily', { ORCA_WIN_DAILY: '1' }],
+    ['adhoc', { ORCA_WIN_ADHOC: '1' }]
+  ])('keeps %s Windows builds pointed at Storm', (_channel, env) => {
     const config = loadConfigWithEnv(env)
 
-    expect(config.publish.repo).toBe(repo)
-    expect(config.publish.releaseType).toBe('prerelease')
+    expect(config.publish.repo).toBe('orca-storm')
+    expect(config.publish.releaseType).toBe('release')
   })
 
   // Why: ORCA_MAC_* gates hardened runtime, notarization, and root-level
@@ -95,7 +95,7 @@ describe('electron-builder dev-channel identity', () => {
     })
 
     expect(config.mac.notarize).toBe(true)
-    expect(config.publish.repo).toBe('orca-adhoc')
+    expect(config.publish.repo).toBe('orca-storm')
   })
 })
 

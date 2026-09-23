@@ -45,7 +45,7 @@ afterEach(async () => {
 })
 
 async function writePayload(rootPath: string, content = '#!/usr/bin/env bash\n'): Promise<string> {
-  const launcherPath = join(rootPath, 'resources', 'bin', 'orca-ide')
+  const launcherPath = join(rootPath, 'resources', 'bin', 'orca-storm')
   await mkdir(dirname(launcherPath), { recursive: true })
   await writeFile(launcherPath, content, { mode: 0o755 })
   return launcherPath

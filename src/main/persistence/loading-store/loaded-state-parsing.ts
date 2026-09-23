@@ -41,6 +41,7 @@ import { hasStateBackup } from './backup-recovery-rotation'
 import { prepareLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import { normalizeLoadedProfileState } from './normalize-loaded-profile-state'
+import { readStormSettings } from './storm-settings-overlay'
 
 type PersistenceStartupDetails = Record<string, unknown> | (() => Record<string, unknown>)
 
@@ -64,10 +65,12 @@ import type { LoadedCohortMigrationOperations } from './loaded-cohort-migrations
 type LoadedStateParsingOperationsRuntime = Pick<
   StoreRuntimeState,
   | 'dataFile'
+  | 'canonicalSettingsRaw'
   | 'githubCacheDirty'
   | 'loadNeedsSave'
   | 'protectedSecrets'
   | 'storageAuthority'
+  | 'stormSettingsOverlay'
   | 'terminalScrollbackSnapshotStorage'
 >
 
@@ -98,6 +101,14 @@ export class LoadedStateParsingOperations {
         logPersistenceStartupMilestone('persistence-json-parse-start')
         const parsed = JSON.parse(raw) as PersistedState
         logPersistenceStartupMilestone('persistence-json-parse-done')
+
+        if (this.runtime.stormSettingsOverlay) {
+          this.runtime.canonicalSettingsRaw = structuredClone(parsed.settings)
+          const stormSettings = readStormSettings(dataFile)
+          if (stormSettings) {
+            parsed.settings = Object.assign({}, parsed.settings, stormSettings)
+          }
+        }
 
         // Why: secrets are stored encrypted via safeStorage; decrypt at the load boundary so the app sees plaintext.
         if (parsed.settings?.opencodeSessionCookie) {
@@ -196,6 +207,9 @@ export class LoadedStateParsingOperations {
 
     if (result === null) {
       result = getDefaultPersistedState(homedir())
+      if (this.runtime.stormSettingsOverlay) {
+        this.runtime.canonicalSettingsRaw = structuredClone(result.settings)
+      }
     }
 
     const workspaceSession = pruneWorkspaceSessionBrowserHistory(

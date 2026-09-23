@@ -13,7 +13,7 @@ import { extractLegacyAppImageCliWrapperTarget } from './legacy-appimage-cli-wra
 // Why: electron-builder's /opt directory name varies with productName sanitization, which is why
 // resources/linux/packaging/after-install.sh enumerates all three of these. A symlink into one is a
 // previous packaged Orca and is ours to reclaim; anything else stays a conflict.
-const PACKAGED_LINUX_LAUNCHER_DIRECTORIES = ['/opt/Orca', '/opt/orca-ide', '/opt/orca']
+const PACKAGED_LINUX_LAUNCHER_DIRECTORIES = ['/opt/Orca Storm', '/opt/orca-storm']
 
 export class CliCommandInspection extends CliInstallLocation {
   protected async inspectSymlink(

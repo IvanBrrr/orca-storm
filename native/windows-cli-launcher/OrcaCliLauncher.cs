@@ -12,7 +12,7 @@ internal static class OrcaCliLauncher
             string launcherDirectory = Path.GetDirectoryName(typeof(OrcaCliLauncher).Assembly.Location);
             string resourcesDirectory = Directory.GetParent(launcherDirectory).FullName;
             string appDirectory = Directory.GetParent(resourcesDirectory).FullName;
-            string electronPath = Path.Combine(appDirectory, "Orca.exe");
+            string electronPath = Path.Combine(appDirectory, "Orca Storm.exe");
             string cliPath = Path.Combine(
                 resourcesDirectory,
                 "app.asar.unpacked",
@@ -23,7 +23,7 @@ internal static class OrcaCliLauncher
 
             if (!File.Exists(electronPath))
             {
-                Console.Error.WriteLine("Unable to locate Orca.exe next to \"{0}\"", resourcesDirectory);
+                Console.Error.WriteLine("Unable to locate Orca Storm.exe next to \"{0}\"", resourcesDirectory);
                 return 1;
             }
 
@@ -48,11 +48,7 @@ internal static class OrcaCliLauncher
             MoveEnvironmentVariable("NODE_REPL_EXTERNAL_MODULE", "ORCA_NODE_REPL_EXTERNAL_MODULE");
             Environment.SetEnvironmentVariable("ELECTRON_RUN_AS_NODE", "1");
             Environment.SetEnvironmentVariable("ORCA_WINDOWS_PACKAGED_CLI_LAUNCHER", "1");
-            string requestedCliCommand = Environment.GetEnvironmentVariable("ORCA_CLI_COMMAND");
-            Environment.SetEnvironmentVariable(
-                "ORCA_CLI_COMMAND",
-                requestedCliCommand == "orca-ide" ? "orca-ide" : "orca"
-            );
+            Environment.SetEnvironmentVariable("ORCA_CLI_COMMAND", "orca-storm");
 
             using (Process child = Process.Start(startInfo))
             {

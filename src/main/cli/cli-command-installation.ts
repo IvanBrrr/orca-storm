@@ -99,7 +99,7 @@ export class CliCommandInstallation extends CliCommandInspection {
   }
 
   protected async removeLegacyLinuxCommandIfManaged(launcherPath: string | null): Promise<void> {
-    if (this.platform !== 'linux' || this.commandPathOverride || !launcherPath) {
+    if (this.platform !== 'linux' || this.commandPathOverride || !launcherPath || this.isPackaged) {
       return
     }
 

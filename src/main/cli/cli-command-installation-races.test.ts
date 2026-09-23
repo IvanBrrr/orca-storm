@@ -83,10 +83,10 @@ async function createMacCommandFixture() {
   const root = await mkdtemp(join(tmpdir(), 'orca-cli-command-race-'))
   createdRoots.push(root)
   const commandDirectory = join(root, 'bin')
-  const commandPath = join(commandDirectory, 'orca')
+  const commandPath = join(commandDirectory, 'orca-storm')
   const resourcesPath = join(root, 'Current.app', 'Contents', 'Resources')
-  const launcherPath = join(resourcesPath, 'bin', 'orca')
-  const staleLauncherPath = join(root, 'Old.app', 'Contents', 'Resources', 'bin', 'orca')
+  const launcherPath = join(resourcesPath, 'bin', 'orca-storm')
+  const staleLauncherPath = join(root, 'Old.app', 'Contents', 'Resources', 'bin', 'orca-storm')
   await mkdir(commandDirectory, { recursive: true })
   await mkdir(dirname(launcherPath), { recursive: true })
   await writeFile(launcherPath, '#!/usr/bin/env bash\n', { mode: 0o755 })
@@ -138,7 +138,7 @@ async function recoveryPath(commandDirectory: string): Promise<string> {
   if (!transactionName) {
     throw new Error('Expected a preserved CLI command transaction.')
   }
-  return join(commandDirectory, transactionName, 'orca')
+  return join(commandDirectory, transactionName, 'orca-storm')
 }
 
 async function rejectionFrom(operation: Promise<unknown>): Promise<Error> {
@@ -300,87 +300,62 @@ describe.skipIf(process.platform === 'win32')('CLI command filesystem races', ()
     await expect(readlink(fixture.commandPath)).resolves.toBe(contenderTarget)
   })
 
-  it('keeps a foreign legacy Linux command when readlink loses the inspection race', async () => {
+  it('does not inspect the official Linux command during Storm registration', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-cli-legacy-race-'))
     createdRoots.push(root)
     const homePath = join(root, 'home')
     const commandDirectory = join(homePath, '.local', 'bin')
     const resourcesPath = join(root, 'resources')
-    const launcherPath = join(resourcesPath, 'bin', 'orca-ide')
+    const launcherPath = join(resourcesPath, 'bin', 'orca-storm')
     const legacyPath = join(commandDirectory, 'orca')
     const managedLegacyTarget = join(resourcesPath, 'bin', 'orca')
-    const foreignTarget = join(root, 'foreign-orca')
     await mkdir(commandDirectory, { recursive: true })
     await mkdir(dirname(launcherPath), { recursive: true })
     await writeFile(launcherPath, '#!/usr/bin/env bash\n', { mode: 0o755 })
     await symlink(managedLegacyTarget, legacyPath)
 
-    legacyReadlinkRace.commandPath = legacyPath
-    legacyReadlinkRace.replacementTarget = foreignTarget
     const installer = new CliInstaller({
       platform: 'linux',
       isPackaged: true,
       userDataPath: join(root, 'user-data'),
       resourcesPath,
-      execPath: join(root, 'orca-ide'),
+      execPath: join(root, 'orca-storm'),
       appPath: join(root, 'resources', 'app.asar'),
       homePath,
       processPathEnv: commandDirectory
     })
 
     await expect(installer.install()).resolves.toMatchObject({ state: 'installed' })
-    await expect(readlink(legacyPath)).resolves.toBe(foreignTarget)
+    expect(legacyReadlinkRace.commandPath).toBe('')
+    await expect(readlink(legacyPath)).resolves.toBe(managedLegacyTarget)
   })
 
-  it('keeps a foreign legacy Linux command whose quarantined inode is reused', async () => {
+  it('does not quarantine the official Linux command during Storm registration', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-cli-legacy-identity-race-'))
     createdRoots.push(root)
     const homePath = join(root, 'home')
     const commandDirectory = join(homePath, '.local', 'bin')
     const resourcesPath = join(root, 'resources')
-    const launcherPath = join(resourcesPath, 'bin', 'orca-ide')
+    const launcherPath = join(resourcesPath, 'bin', 'orca-storm')
     const legacyPath = join(commandDirectory, 'orca')
     const managedTarget = join(resourcesPath, 'bin', 'orca')
-    const foreignTarget = join(root, 'foreign-orca')
     await mkdir(commandDirectory, { recursive: true })
     await mkdir(dirname(launcherPath), { recursive: true })
     await writeFile(launcherPath, '#!/usr/bin/env bash\n', { mode: 0o755 })
     await symlink(managedTarget, legacyPath)
-    const original = await lstat(legacyPath, { bigint: true })
-
-    class LegacyRaceInstaller extends CliInstaller {
-      protected override async quarantineCommandPath(commandPath: string) {
-        if (commandPath === legacyPath) {
-          await unlink(commandPath)
-          await symlink(foreignTarget, commandPath)
-        }
-        const quarantine = await super.quarantineCommandPath(commandPath)
-        if (commandPath === legacyPath && quarantine.snapshot) {
-          reusedIdentity.path = quarantine.heldPath
-          reusedIdentity.dev = original.dev
-          reusedIdentity.ino = original.ino
-          quarantine.snapshot.identity = {
-            ...quarantine.snapshot.identity,
-            dev: original.dev,
-            ino: original.ino
-          }
-        }
-        return quarantine
-      }
-    }
-
-    const installer = new LegacyRaceInstaller({
+    const installer = new CliInstaller({
       platform: 'linux',
       isPackaged: true,
       userDataPath: join(root, 'user-data'),
       resourcesPath,
-      execPath: join(root, 'orca-ide'),
+      execPath: join(root, 'orca-storm'),
       appPath: join(root, 'resources', 'app.asar'),
       homePath,
       processPathEnv: commandDirectory
     })
 
     await expect(installer.install()).resolves.toMatchObject({ state: 'installed' })
-    await expect(readlink(legacyPath)).resolves.toBe(foreignTarget)
+    expect(reusedIdentity.path).toBe('')
+    await expect(readlink(legacyPath)).resolves.toBe(managedTarget)
   })
 })

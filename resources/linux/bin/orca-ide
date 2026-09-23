@@ -16,7 +16,7 @@ APP_DIR="$(cd "$RESOURCES_DIR/.." >/dev/null 2>&1 && pwd)"
 # Why: Linux executableName is `orca-ide` (avoids Ubuntu GNOME Orca conflict);
 # `-f` rejects a same-named directory that `-x` alone would accept.
 ELECTRON=""
-for candidate in orca-ide orca Orca; do
+for candidate in orca-storm; do
 	if [ -f "$APP_DIR/$candidate" ] && [ -x "$APP_DIR/$candidate" ]; then
 		ELECTRON="$APP_DIR/$candidate"
 		break
@@ -35,6 +35,7 @@ CLI="$RESOURCES_DIR/app.asar.unpacked/out/cli/index.js"
 
 export ORCA_NODE_OPTIONS="${NODE_OPTIONS-}"
 export ORCA_NODE_REPL_EXTERNAL_MODULE="${NODE_REPL_EXTERNAL_MODULE-}"
+export ORCA_CLI_COMMAND=orca-storm
 unset NODE_OPTIONS
 unset NODE_REPL_EXTERNAL_MODULE
 

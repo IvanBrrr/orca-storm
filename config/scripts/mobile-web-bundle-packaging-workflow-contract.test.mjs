@@ -95,6 +95,7 @@ const EXPECTED_PACKAGING_JOBS = [
   'pr.yml package_windows',
   'release-cut.yml build',
   'release-mac-build.yml build-mac',
+  'storm-build.yml package',
   'win-crash-survival-e2e.yml crash-survival',
   'win-update-survival-e2e.yml survival',
   'windows-signing-rehearsal.yml rehearse'

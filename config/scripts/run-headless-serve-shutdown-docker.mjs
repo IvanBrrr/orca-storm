@@ -107,7 +107,7 @@ try {
       'timeout --kill-after=10s 120s /input/orca.AppImage --appimage-extract > /artifacts/appimage-extract.log 2>&1',
       'mv squashfs-root root',
       launcherExecOverlay
-        ? "sed -i 's/^ELECTRON_RUN_AS_NODE=1 /export ELECTRON_RUN_AS_NODE=1\\nexec /' /artifacts/root/resources/bin/orca-ide"
+        ? "sed -i 's/^ELECTRON_RUN_AS_NODE=1 /export ELECTRON_RUN_AS_NODE=1\\nexec /' /artifacts/root/resources/bin/orca-storm"
         : ':',
       'chmod -R a+rX /artifacts/root',
       'rm /artifacts/appimage-help.log /artifacts/appimage-extract.log'

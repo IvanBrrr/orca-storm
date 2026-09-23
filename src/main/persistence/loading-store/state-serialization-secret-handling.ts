@@ -19,7 +19,11 @@ import type { StoreRuntimeState } from './store-runtime-state'
 
 type StateSerializationSecretHandlingOperationsRuntime = Pick<
   StoreRuntimeState,
-  'protectedSecrets' | 'state'
+  | 'canonicalSettingsRaw'
+  | 'lastStormSettingsHash'
+  | 'protectedSecrets'
+  | 'state'
+  | 'stormSettingsOverlay'
 >
 
 export class StateSerializationSecretHandlingOperations {
@@ -34,6 +38,7 @@ export class StateSerializationSecretHandlingOperations {
     payload: Buffer
     stateHash: string
     protectedSecretUpdates: ProtectedSecretRetentionUpdate[]
+    stormSettings?: { payload: Buffer; stateHash: string }
   } {
     // Why sentinels (not a blob/key string match): the substitution must be
     // position-exact. A plain search for the ciphertext — or even for a
@@ -141,9 +146,20 @@ export class StateSerializationSecretHandlingOperations {
         )
       }
     }
+    const settingsPayload = this.runtime.stormSettingsOverlay
+      ? applySecretSentinelSubstitutions(
+          JSON.stringify(stateToSave.settings),
+          secretSubs,
+          protectedStorageDegraded ? 'safeStorage-degraded\0' : ''
+        )
+      : null
     // Why compact: ~20% fewer bytes and less serialize time; all readers JSON.parse so formatting is irrelevant.
     // One full-state stringify; secret slots currently hold sentinels.
-    const serialized = JSON.stringify(stateToSave)
+    const serialized = JSON.stringify(
+      this.runtime.stormSettingsOverlay
+        ? { ...stateToSave, settings: this.runtime.canonicalSettingsRaw ?? stateToSave.settings }
+        : stateToSave
+    )
     // Substitute each unique sentinel: ciphertext for the on-disk payload, a stable normalized
     // value for the guard hash. One pass builds both, so the multi-MB state is never copied per
     // sentinel and never encoded twice.
@@ -152,6 +168,13 @@ export class StateSerializationSecretHandlingOperations {
       secretSubs,
       protectedStorageDegraded ? 'safeStorage-degraded\0' : ''
     )
-    return { payload, stateHash, protectedSecretUpdates }
+    return {
+      payload,
+      stateHash,
+      protectedSecretUpdates,
+      ...(settingsPayload && settingsPayload.stateHash !== this.runtime.lastStormSettingsHash
+        ? { stormSettings: settingsPayload }
+        : {})
+    }
   }
 }

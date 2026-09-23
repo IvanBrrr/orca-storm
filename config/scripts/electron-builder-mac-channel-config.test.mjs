@@ -46,12 +46,12 @@ const withAdhocEnv = (assert) => withEnv({ ORCA_MAC_ADHOC: '1' }, assert)
 describe('electron-builder mac channel config', () => {
   // Why: Squirrel.Mac swaps the .app in place only when the replacement carries the
   // same bundle id and a valid Developer ID signature. A hourly built on the local
-  // (com.stablyai.orca.local, ad-hoc) identity would be un-installable over a real
+  // (com.ivanbrrr.orcastorm.local, ad-hoc) identity would be un-installable over a real
   // Orca — the whole point of the channel.
   it('builds hourly artifacts with the release signing identity', () => {
     withHourlyEnv((config) => {
       expect(config.mac.appId).toBeUndefined()
-      expect(config.appId).toBe('com.stablyai.orca')
+      expect(config.appId).toBe('com.ivanbrrr.orcastorm')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
     })
@@ -76,11 +76,11 @@ describe('electron-builder mac channel config', () => {
   // break update checks for every real user.
   it('publishes hourly builds to the separate hourly repo', () => {
     withHourlyEnv((config) => {
-      expect(config.publish).toMatchObject({ repo: 'orca-hourly', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({ repo: 'orca-storm', releaseType: 'release' })
     })
     expect(electronBuilderConfig.publish).toMatchObject({
-      repo: 'orca',
-      releaseType: 'draft'
+      repo: 'orca-storm',
+      releaseType: 'release'
     })
   })
 
@@ -98,11 +98,11 @@ describe('electron-builder mac channel config', () => {
   // argument apply. Only the destination repo differs.
   it('builds adhoc artifacts with the release identity and its own repo', () => {
     withAdhocEnv((config) => {
-      expect(config.appId).toBe('com.stablyai.orca')
+      expect(config.appId).toBe('com.ivanbrrr.orcastorm')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toMatchObject({ repo: 'orca-adhoc', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({ repo: 'orca-storm', releaseType: 'release' })
     })
   })
 
@@ -117,11 +117,11 @@ describe('electron-builder mac channel config', () => {
 
   it('builds daily artifacts with the release identity and its own repo', () => {
     withDailyEnv((config) => {
-      expect(config.appId).toBe('com.stablyai.orca')
+      expect(config.appId).toBe('com.ivanbrrr.orcastorm')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toMatchObject({ repo: 'orca-daily', releaseType: 'prerelease' })
+      expect(config.publish).toMatchObject({ repo: 'orca-storm', releaseType: 'release' })
     })
   })
 
@@ -143,7 +143,7 @@ describe('electron-builder mac channel config', () => {
       withDailyEnv((daily) => {
         withAdhocEnv((adhoc) => {
           expect(new Set([hourly.publish.repo, daily.publish.repo, adhoc.publish.repo]).size).toBe(
-            3
+            1
           )
         })
       })

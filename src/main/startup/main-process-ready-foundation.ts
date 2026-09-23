@@ -136,7 +136,8 @@ export async function initializeReadyFoundation(): Promise<void> {
   initializeBrowserClientHostId(profile.profileDirectory)
   const store = new Store({
     dataFile: profile.dataFile,
-    storageAuthority: state.isServeMode ? 'runtime' : 'desktop'
+    storageAuthority: state.isServeMode ? 'runtime' : 'desktop',
+    stormSettingsOverlay: true
   })
   state.store = store
   // Why: create pending readiness before the guard can observe the default session.

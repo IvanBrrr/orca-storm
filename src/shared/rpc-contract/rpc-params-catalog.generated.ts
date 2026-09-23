@@ -399,6 +399,19 @@ import {
 import { WorkerStartParams } from './orchestration-worker-start-params'
 import { WorkerDispatchParams as WorkerDispatchParamsOfOrchestrationWorkerStopParams } from './orchestration-worker-stop-params'
 import {
+  AddComment,
+  Connect as ConnectOfPlaneParams,
+  CreateWorkItem,
+  GetWorkItem,
+  ListWorkItems,
+  ProjectId as ProjectIdOfPlaneParams,
+  SearchWorkItems,
+  SelectWorkspace as SelectWorkspaceOfPlaneParams,
+  UpdateWorkItem,
+  WorkItemScope,
+  WorkspaceScope
+} from './plane-params'
+import {
   PluginInvokeCommandParams,
   PluginReadPanelEntryParams,
   PluginSetEnabledParams,
@@ -1016,6 +1029,22 @@ export const RPC_PARAMS_BY_METHOD = {
   'orchestration.workerTerminalUserInput': OrchestrationWorkerTerminalUserInputParams,
   'pairing.getEndpoints': PairingGetEndpointsParamsSchema,
   'pairing.provisionRelay': PairingProvisionRelayParamsSchema,
+  'plane.addComment': AddComment,
+  'plane.connect': ConnectOfPlaneParams,
+  'plane.createWorkItem': CreateWorkItem,
+  'plane.disconnect': WorkspaceScope,
+  'plane.getWorkItem': GetWorkItem,
+  'plane.listLabels': ProjectIdOfPlaneParams,
+  'plane.listMembers': WorkspaceScope,
+  'plane.listProjects': WorkspaceScope,
+  'plane.listStates': ProjectIdOfPlaneParams,
+  'plane.listWorkItems': ListWorkItems,
+  'plane.searchWorkItems': SearchWorkItems,
+  'plane.selectWorkspace': SelectWorkspaceOfPlaneParams,
+  'plane.status': null,
+  'plane.testConnection': WorkspaceScope,
+  'plane.updateWorkItem': UpdateWorkItem,
+  'plane.workItemComments': WorkItemScope,
   'plugins.consent': pluginConsentRequestSchema,
   'plugins.invokeCommand': PluginInvokeCommandParams,
   'plugins.list': null,

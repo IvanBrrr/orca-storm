@@ -41,10 +41,17 @@ const isWinHourly = process.env.ORCA_WIN_HOURLY === '1'
 const isWinDaily = process.env.ORCA_WIN_DAILY === '1'
 const isWinAdhoc = process.env.ORCA_WIN_ADHOC === '1'
 const isWinDevChannel = isWinHourly || isWinDaily || isWinAdhoc
-const isMacRelease = process.env.ORCA_MAC_RELEASE === '1' || isMacHourly || isMacDaily || isMacAdhoc
+const isUnsignedWindowsBuild = true
+const isMacRelease =
+  process.env.ORCA_STORM_MAC_SIGNED === '1' ||
+  process.env.ORCA_MAC_RELEASE === '1' ||
+  isMacHourly ||
+  isMacDaily ||
+  isMacAdhoc
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
 const localBuildVersion =
   isMacRelease || isWinDevChannel ? undefined : process.env.ORCA_LOCAL_BUILD_VERSION
+const stormBuildVersion = process.env.ORCA_STORM_BUILD_VERSION
 const isHourlyChannel = isMacHourly || isWinHourly
 const isDailyChannel = isMacDaily || isWinDaily
 const isAdhocChannel = isMacAdhoc || isWinAdhoc
@@ -55,20 +62,7 @@ const devChannelBuildVersion = isHourlyChannel
     : isAdhocChannel
       ? process.env.ORCA_ADHOC_BUILD_VERSION
       : undefined
-// Why each dev channel gets its own repo rather than tagging into the main one:
-// the releases atom feed exposes only the 10 newest entries, so 24 hourly tags a
-// day would evict every stable/RC entry and strand users on a feed with nothing
-// to install. Keeping adhoc/daily separate from hourly too means a branch build
-// or a once-a-day cut cannot be picked up by someone who only meant to ride
-// main's hourlies.
-const devChannelRepo = isHourlyChannel
-  ? 'orca-hourly'
-  : isDailyChannel
-    ? 'orca-daily'
-    : isAdhocChannel
-      ? 'orca-adhoc'
-      : null
-const appId = 'com.stablyai.orca'
+const appId = 'com.ivanbrrr.orcastorm'
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall'
@@ -165,14 +159,16 @@ const windowsRuntimeResources = existsSync(
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca',
-  protocols: [{ name: 'Orca', schemes: ['orca'] }],
+  productName: 'Orca Storm',
+  protocols: [{ name: 'Orca Storm', schemes: ['orca-storm'] }],
   toolsets: { appimage: '1.0.3' },
-  ...(devChannelBuildVersion
-    ? { extraMetadata: { version: devChannelBuildVersion } }
-    : localBuildVersion
-      ? { extraMetadata: { version: localBuildVersion } }
-      : {}),
+  ...(stormBuildVersion
+    ? { extraMetadata: { version: stormBuildVersion } }
+    : devChannelBuildVersion
+      ? { extraMetadata: { version: devChannelBuildVersion } }
+      : localBuildVersion
+        ? { extraMetadata: { version: localBuildVersion } }
+        : {}),
   directories: {
     buildResources: 'resources/build'
   },
@@ -410,40 +406,23 @@ module.exports = {
     }
   },
   win: {
-    executableName: 'Orca',
-    // Why: Windows installers are signed after electron-builder packaging by
-    // SignPath, so the packager cannot infer the updater publisherName.
-    //
-    // Why dev channels drop it instead: they ship unsigned, because SignPath's
-    // approval waits are budgeted in hours and cannot fit an hourly cadence.
-    // electron-updater Authenticode-verifies every installer it downloads
-    // against the publisherName baked into the *installed* app's app-update.yml
-    // (NsisUpdater.verifySignature), and skips verification entirely when that
-    // name is absent. An unsigned build that still claimed 'SignPath Foundation'
-    // would therefore reject its own channel's next build — and its way back to
-    // stable with it. Dropping it is what makes dev→dev and dev→stable work.
-    // Why a sign hook on a build that does not sign: it is the only moment
-    // electron-builder exposes the NSIS uninstaller (built in its own makensis
-    // pass, embedded, then deleted). The hook signs nothing — it relays the file
-    // to and from the CI SignPath request, and is inert when the relay env vars
-    // are unset, so local and dev builds are unaffected. publisherName stays on
-    // its existing channel split above.
+    executableName: 'Orca Storm',
+    // Storm's Windows installer is unsigned; omit publisherName so its own updates remain installable.
     signtoolOptions: {
       sign: signWindowsUninstallerViaSignPath,
-      ...(isWinDevChannel ? {} : { publisherName: 'SignPath Foundation' })
+      ...(isUnsignedWindowsBuild ? {} : { publisherName: 'SignPath Foundation' })
     },
-    ...(isWinDevChannel ? { verifyUpdateCodeSignature: false } : {}),
     extraResources: [
       ...commonExtraResources,
       ...windowsRuntimeResources,
       winSpeechNativeResource,
       {
         from: 'resources/win32/bin/orca.cmd',
-        to: 'bin/orca.cmd'
+        to: 'bin/orca-storm.cmd'
       },
       {
         from: 'native/windows-cli-launcher/.build/orca.exe',
-        to: 'bin/orca.exe'
+        to: 'bin/orca-storm.exe'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-win32-x64.exe',
@@ -457,7 +436,7 @@ module.exports = {
     ]
   },
   nsis: {
-    artifactName: 'orca-windows-setup.${ext}',
+    artifactName: 'orca-storm-windows-setup.${ext}',
     shortcutName: '${productName}',
     uninstallDisplayName: '${productName}',
     createDesktopShortcut: 'always',
@@ -522,7 +501,7 @@ module.exports = {
       macSpeechNativeResource,
       {
         from: 'resources/darwin/bin/orca',
-        to: 'bin/orca'
+        to: 'bin/orca-storm'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-darwin-${arch}',
@@ -562,7 +541,7 @@ module.exports = {
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
   forceCodeSigning: isMacRelease,
   dmg: {
-    artifactName: 'orca-macos-${arch}.${ext}'
+    artifactName: 'orca-storm-macos-${arch}.${ext}'
   },
   linux: {
     // Why mimeTypes and not fileAssociations: shared-mime-info already maps *.md/*.markdown to
@@ -573,7 +552,7 @@ module.exports = {
     mimeTypes: ['text/markdown'],
     // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
     // The Linux installer should not claim those system package/file names.
-    executableName: 'orca-ide',
+    executableName: 'orca-storm',
     // Why: the icns source lets electron-builder emit standard hicolor PNG
     // sizes; a single 1024px PNG is ignored by some Linux docks/launchers.
     icon: 'resources/build/icon.icns',
@@ -581,7 +560,7 @@ module.exports = {
       entry: {
         // Why: Electron reports WM_CLASS=orca for the visible Linux window;
         // GNOME docks need an exact match to group it with orca-ide.desktop.
-        StartupWMClass: 'orca'
+        StartupWMClass: 'orca-storm'
       }
     },
     extraResources: [
@@ -590,7 +569,7 @@ module.exports = {
       linuxSpeechNativeResource,
       {
         from: 'resources/linux/bin/orca-ide',
-        to: 'bin/orca-ide'
+        to: 'bin/orca-storm'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-linux-${arch}',
@@ -604,15 +583,15 @@ module.exports = {
     ],
     // Keep local artifacts aligned with the release pipeline.
     target: ['AppImage', 'deb', 'rpm'],
-    maintainer: 'stablyai',
+    maintainer: 'IvanBrrr',
     category: 'Utility'
   },
   appImage: {
-    artifactName: isLinuxArm64Release ? 'orca-linux-arm64.${ext}' : 'orca-linux.${ext}'
+    artifactName: isLinuxArm64Release ? 'orca-storm-linux-arm64.${ext}' : 'orca-storm-linux.${ext}'
   },
   deb: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide_${version}_${arch}.${ext}',
+    packageName: 'orca-storm',
+    artifactName: 'orca-storm_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
@@ -626,16 +605,12 @@ module.exports = {
       'xclip',
       'xvfb'
     ],
-    // Why: symlink the bundled CLI onto PATH at install time so `orca-ide serve`
-    // works on a headless host. The in-app CLI registration (CliInstaller) is
-    // GUI-triggered and can never run on a server, so without this the CLI is
-    // unreachable from the shell on exactly the hosts that need it.
     afterInstall: 'resources/linux/packaging/after-install.sh',
     afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
   rpm: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide-${version}.${arch}.${ext}',
+    packageName: 'orca-storm',
+    artifactName: 'orca-storm-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [
@@ -646,7 +621,6 @@ module.exports = {
       'xclip',
       'xorg-x11-server-Xvfb'
     ],
-    // Why: same headless CLI-on-PATH registration as deb; rpm runs these via fpm.
     afterInstall: 'resources/linux/packaging/after-install.sh',
     afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
@@ -660,13 +634,10 @@ module.exports = {
   npmRebuild: true,
   publish: {
     provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
-    // Why draft on the main repo: `--publish always` otherwise creates a
-    // public GitHub release as soon as the first platform uploads, and
-    // /releases/latest serves a missing Windows exe. release-cut undrafts
-    // only after every required asset exists.
-    releaseType: devChannelRepo ? 'prerelease' : 'draft'
+    owner: 'IvanBrrr',
+    repo: 'orca-storm',
+    // The Storm workflow publishes only after all platform artifacts are ready.
+    releaseType: 'release'
   }
 }
 
@@ -684,7 +655,7 @@ function chmodUnixCliLaunchers(resourcesDir, electronPlatformName) {
   if (electronPlatformName === 'win32') {
     return
   }
-  for (const launcherName of ['orca', 'orca-ide']) {
+  for (const launcherName of ['orca-storm']) {
     const launcherPath = join(resourcesDir, 'bin', launcherName)
     if (!existsSync(launcherPath)) {
       continue

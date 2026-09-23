@@ -741,6 +741,9 @@ jobs:
           filter: blob:none
           persist-credentials: false
 
+      - name: Fetch upstream release tags
+        run: git fetch --filter=blob:none --no-tags https://github.com/stablyai/orca.git '+refs/tags/v*:refs/tags/v*'
+
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
@@ -880,23 +883,23 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('./package.json').version")"
-          deb="dist/orca-ide_${version}_amd64.deb"
-          rpm="dist/orca-ide-${version}.x86_64.rpm"
+          deb="dist/orca-storm_${version}_amd64.deb"
+          rpm="dist/orca-storm-${version}.x86_64.rpm"
           test -s "$deb"
           test -s "$rpm"
-          deb_marker="$(dpkg-deb --fsys-tarfile "$deb" | tar -xOf - ./opt/Orca/resources/package-type)"
-          rpm_marker="$(rpm2cpio "$rpm" | cpio --quiet --extract --to-stdout ./opt/Orca/resources/package-type)"
+          deb_marker="$(dpkg-deb --fsys-tarfile "$deb" | tar -xOf - './opt/Orca Storm/resources/package-type')"
+          rpm_marker="$(rpm2cpio "$rpm" | cpio --quiet --extract --to-stdout './opt/Orca Storm/resources/package-type')"
           [[ "$deb_marker" == deb ]] || { echo "Expected deb marker, got: $deb_marker"; exit 1; }
           [[ "$rpm_marker" == rpm ]] || { echo "Expected rpm marker, got: $rpm_marker"; exit 1; }
 
       - name: Verify headless serve signal shutdown
         run: >-
           node config/scripts/run-headless-serve-shutdown-docker.mjs
-          --appimage dist/orca-linux.AppImage --all-entrypoints
+          --appimage dist/orca-storm-linux.AppImage --all-entrypoints
 
       # A default container reproduces the hostile AppImage launch environment.
       - name: Verify Linux CLI launch contract
-        run: node config/scripts/run-linux-cli-launch-contract-docker.mjs --appimage dist/orca-linux.AppImage
+        run: node config/scripts/run-linux-cli-launch-contract-docker.mjs --appimage dist/orca-storm-linux.AppImage
 
       - name: Smoke packaged CLI
         run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/linux-unpacked
@@ -1041,7 +1044,7 @@ jobs:
         run: pnpm exec electron-builder --config config/electron-builder.config.cjs --dir
 
       - name: Smoke packaged Windows PTY native capability
-        run: pnpm run smoke:windows-pty-native-capability -- --exe=dist/win-unpacked/Orca.exe
+        run: pnpm run smoke:windows-pty-native-capability -- --exe="dist/win-unpacked/Orca Storm.exe"
 
       - name: Smoke packaged CLI
         run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/win-unpacked
