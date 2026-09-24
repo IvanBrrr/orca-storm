@@ -22,7 +22,7 @@ export function readStormSettings(dataFile: string): Record<string, unknown> | n
       ? Object.fromEntries(Object.entries(value))
       : null
   } catch (error) {
-    console.warn('[persistence] Could not read Orca Storm settings:', error)
+    console.warn('[persistence] Could not read Storca settings:', error)
     return null
   }
 }

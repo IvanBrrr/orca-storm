@@ -1,4 +1,4 @@
-name: Orca Storm build
+name: Storca build
 
 on:
   push:
@@ -168,5 +168,5 @@ jobs:
           mapfile -d '' assets < <(find release-assets -maxdepth 1 -type f -print0)
           test "${#assets[@]}" -gt 0
           gh release create "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" \
-            --target "$SOURCE_SHA" --latest --title "Orca Storm $TAG" \
-            --notes "Orca Storm build from $SOURCE_SHA."
+            --target "$SOURCE_SHA" --latest --title "Storca $TAG" \
+            --notes "Storca build from $SOURCE_SHA."

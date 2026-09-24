@@ -12,7 +12,7 @@ internal static class OrcaCliLauncher
             string launcherDirectory = Path.GetDirectoryName(typeof(OrcaCliLauncher).Assembly.Location);
             string resourcesDirectory = Directory.GetParent(launcherDirectory).FullName;
             string appDirectory = Directory.GetParent(resourcesDirectory).FullName;
-            string electronPath = Path.Combine(appDirectory, "Orca Storm.exe");
+            string electronPath = Path.Combine(appDirectory, "Storca.exe");
             string cliPath = Path.Combine(
                 resourcesDirectory,
                 "app.asar.unpacked",
@@ -23,7 +23,7 @@ internal static class OrcaCliLauncher
 
             if (!File.Exists(electronPath))
             {
-                Console.Error.WriteLine("Unable to locate Orca Storm.exe next to \"{0}\"", resourcesDirectory);
+                Console.Error.WriteLine("Unable to locate Storca.exe next to \"{0}\"", resourcesDirectory);
                 return 1;
             }
 

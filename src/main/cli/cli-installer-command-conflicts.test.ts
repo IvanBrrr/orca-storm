@@ -54,7 +54,7 @@ describe('CliInstaller', () => {
         platform: 'darwin',
         isPackaged: false,
         userDataPath: fixture.userDataPath,
-        execPath: '/Applications/Orca.app/Contents/MacOS/Orca Storm',
+        execPath: '/Applications/Storca.app/Contents/MacOS/Storca',
         appPath: fixture.appPath,
         commandPathOverride: installPath
       })

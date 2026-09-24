@@ -4,7 +4,7 @@ import type { AppIdentity } from '../../shared/app-identity'
 
 const BASE_APP_NAME = 'Orca'
 const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
-const STORM_APP_NAME = 'Orca Storm'
+const STORM_APP_NAME = 'Storca'
 const STORM_APP_USER_MODEL_ID = 'com.ivanbrrr.orcastorm'
 const MAX_LABEL_LENGTH = 80
 

@@ -63,7 +63,7 @@ describe('headless serve shutdown PR gate', () => {
     expect(markerStep.run).toContain('rpm2cpio')
     expect(steps.indexOf(markerStep)).toBeGreaterThan(steps.indexOf(packageStep))
     expect(shutdownStep.run).toBe(
-      'node config/scripts/run-headless-serve-shutdown-docker.mjs --appimage dist/orca-storm-linux.AppImage --all-entrypoints'
+      'node config/scripts/run-headless-serve-shutdown-docker.mjs --appimage dist/storca-linux.AppImage --all-entrypoints'
     )
     expect(steps.indexOf(shutdownStep)).toBeGreaterThan(steps.indexOf(packageStep))
     expect(steps.indexOf(shutdownStep)).toBeGreaterThan(steps.indexOf(markerStep))

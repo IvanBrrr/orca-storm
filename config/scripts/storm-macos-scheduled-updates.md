@@ -1,22 +1,22 @@
-# Scheduled Orca Storm updates on macOS
+# Scheduled Storca updates on macOS
 
-Orca Storm can update from this fork's GitHub Releases without an Apple Developer certificate. Install the DMG once, then run this from a checkout of the fork:
+Storca can update from this fork's GitHub Releases without an Apple Developer certificate. Install the DMG once, then run this from a checkout of the fork:
 
 ```bash
 bash config/scripts/install-storm-macos-updater.sh
 ```
 
-The installer adds a per-user `launchd` agent that checks on login and daily at 10:00 local time. A missed scheduled run fires when the Mac wakes. It updates an existing `~/Applications/Orca Storm.app` or `/Applications/Orca Storm.app` while the app is closed. Use `~/Applications` if your account cannot write to `/Applications`. If both locations contain Orca Storm, remove the duplicate before enabling updates. A file lock prevents overlapping runs. The updater leaves the official Orca app, worktrees, sessions, and settings untouched.
+The installer adds a per-user `launchd` agent that checks on login and daily at 10:00 local time. A missed scheduled run fires when the Mac wakes. It updates an existing `~/Applications/Storca.app` or `/Applications/Storca.app` while the app is closed. It also migrates an older `Orca Storm.app` in either location to `Storca.app` on the first update. Use `~/Applications` if your account cannot write to `/Applications`. Remove duplicate installations before enabling updates. A file lock prevents overlapping runs. The updater leaves the official Orca app, worktrees, sessions, and settings untouched.
 
-Each run checks the latest release version and downloads the DMG for the Mac's CPU only when a new version exists. Only builds from `main` are published as releases. The updater compares the download with the SHA-256 digest recorded by GitHub, checks the bundle ID and version, then swaps the app bundle. The previous bundle remains in `.Orca Storm.updater-backup` beside the installed app until the next update. A failed swap restores it. An open app defers the update until a later run.
+Each run checks the latest release version and downloads the DMG for the Mac's CPU only when a new version exists. Only builds from `main` are published as releases. The updater compares the download with the SHA-256 digest recorded by GitHub, checks the bundle ID and version, then swaps the app bundle. The previous bundle remains in `.Storca.updater-backup` beside the installed app until the next update. A failed swap restores it. An open app defers the update until a later run. Existing Orca Storm updater installations need this installer run once to learn the new DMG name.
 
 Run a check immediately with:
 
 ```bash
-bash "$HOME/Library/Application Support/Orca Storm/update-storm-macos.sh"
+bash "$HOME/Library/Application Support/Storca/update-storm-macos.sh"
 ```
 
-Logs are in `~/Library/Application Support/Orca Storm/updater.log` and `updater-error.log`. To remove the scheduled job:
+Logs are in `~/Library/Application Support/Storca/updater.log` and `updater-error.log`. To remove the scheduled job:
 
 ```bash
 bash config/scripts/install-storm-macos-updater.sh --uninstall
