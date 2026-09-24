@@ -15,7 +15,7 @@ is_owned_link() {
   [ -L "$link" ] || return 1
   local link_target candidate candidate_target
   link_target="$(readlink -f -- "$link" 2>/dev/null || true)"
-  for candidate in "/opt/Orca Storm/resources/bin/orca-storm" /opt/orca-storm/resources/bin/orca-storm; do
+  for candidate in /opt/Storca/resources/bin/orca-storm "/opt/Orca Storm/resources/bin/orca-storm" /opt/orca-storm/resources/bin/orca-storm; do
     candidate_target="$(readlink -f -- "$candidate" 2>/dev/null || true)"
     if [ -n "$candidate_target" ] && [ "$link_target" = "$candidate_target" ]; then
       return 0
@@ -24,7 +24,7 @@ is_owned_link() {
   return 1
 }
 
-for dir in "/opt/Orca Storm" /opt/orca-storm; do
+for dir in /opt/Storca "/opt/Orca Storm" /opt/orca-storm; do
   sandbox="$dir/chrome-sandbox"
   if [ -f "$sandbox" ]; then
     # Why: packaged Linux installs must leave Chromium's sandbox helper usable

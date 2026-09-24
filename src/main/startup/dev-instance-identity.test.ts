@@ -4,8 +4,8 @@ import { getDevInstanceIdentity, shouldApplyPreReadyAppName } from './dev-instan
 describe('dev-instance-identity', () => {
   it('keeps packaged identity stable', () => {
     expect(getDevInstanceIdentity(false, {})).toMatchObject({
-      name: 'Orca Storm',
-      appName: 'Orca Storm',
+      name: 'Storca',
+      appName: 'Storca',
       isDev: false,
       devLabel: null,
       dockBadgeLabel: null,

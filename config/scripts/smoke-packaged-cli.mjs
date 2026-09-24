@@ -13,7 +13,7 @@ function readAppDirArg(argv) {
     return explicit.slice('--app-dir='.length)
   }
   if (process.platform === 'darwin') {
-    return 'dist/mac-arm64/Orca Storm.app'
+    return 'dist/mac-arm64/Storca.app'
   }
   if (process.platform === 'win32') {
     return 'dist/win-unpacked'

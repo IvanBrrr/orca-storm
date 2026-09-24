@@ -15,7 +15,7 @@ link="/usr/bin/orca-storm"
 if [ -L "$link" ]; then
   target="$(readlink "$link" || true)"
   case "$target" in
-    /opt/Orca\ Storm/*|/opt/orca-storm/*)
+    /opt/Storca/*|/opt/Orca\ Storm/*|/opt/orca-storm/*)
       rm -f "$link"
       ;;
   esac

@@ -4,37 +4,50 @@ set -euo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 
 if [[ "$(uname -s)" != Darwin ]]; then
-  echo 'Orca Storm updater requires macOS' >&2
+  echo 'Storca updater requires macOS' >&2
   exit 1
 fi
 
 if [[ "${1:-}" != --locked ]]; then
-  lock_dir="$HOME/Library/Application Support/Orca Storm"
+  lock_dir="$HOME/Library/Application Support/Storca"
   mkdir -p "$lock_dir"
   exec lockf -k -t 0 "$lock_dir/update.lock" /bin/bash "$0" --locked
 fi
 
 if [[ "${ORCA_STORM_UPDATE_APP_PATH:-}" != '' ]]; then
   app_path=$ORCA_STORM_UPDATE_APP_PATH
-elif [[ ( -d "$HOME/Applications/Orca Storm.app" || -d "$HOME/Applications/.Orca Storm.updater-backup" ) && ( -d '/Applications/Orca Storm.app' || -d '/Applications/.Orca Storm.updater-backup' ) ]]; then
-  echo 'Two Orca Storm installations found; set ORCA_STORM_UPDATE_APP_PATH' >&2
+elif [[ ( -d "$HOME/Applications/Storca.app" || -d "$HOME/Applications/Orca Storm.app" || -d "$HOME/Applications/.Storca.updater-backup" ) && ( -d '/Applications/Storca.app' || -d '/Applications/Orca Storm.app' || -d '/Applications/.Storca.updater-backup' ) ]]; then
+  echo 'Two Storca installations found; set ORCA_STORM_UPDATE_APP_PATH' >&2
   exit 1
-elif [[ -d "$HOME/Applications/Orca Storm.app" || -d "$HOME/Applications/.Orca Storm.updater-backup" ]]; then
+elif [[ -d "$HOME/Applications/Storca.app" ]]; then
+  app_path="$HOME/Applications/Storca.app"
+elif [[ -d "$HOME/Applications/Orca Storm.app" ]]; then
   app_path="$HOME/Applications/Orca Storm.app"
-elif [[ -d '/Applications/Orca Storm.app' || -d '/Applications/.Orca Storm.updater-backup' ]]; then
+elif [[ -d "$HOME/Applications/.Storca.updater-backup" ]]; then
+  app_path="$HOME/Applications/Storca.app"
+elif [[ -d '/Applications/Storca.app' ]]; then
+  app_path='/Applications/Storca.app'
+elif [[ -d '/Applications/Orca Storm.app' ]]; then
   app_path='/Applications/Orca Storm.app'
+elif [[ -d '/Applications/.Storca.updater-backup' ]]; then
+  app_path='/Applications/Storca.app'
 else
-  echo 'Install Orca Storm once from the DMG before enabling updates'
+  echo 'Install Storca once from the DMG before enabling updates'
   exit 0
 fi
 
 app_parent=$(dirname "$app_path")
-backup_path="$app_parent/.Orca Storm.updater-backup"
+backup_path="$app_parent/.Storca.updater-backup"
+new_app_path="$app_parent/Storca.app"
+if [[ -d "$app_parent/Orca Storm.app" && -d "$new_app_path" ]]; then
+  echo "Both Orca Storm and Storca are installed in $app_parent; remove the duplicate" >&2
+  exit 1
+fi
 if [[ ! -d "$app_path" && -d "$backup_path" ]]; then
   mv "$backup_path" "$app_path"
 fi
 if [[ ! -d "$app_path" || ! -w "$app_parent" ]]; then
-  echo "Orca Storm is missing or $app_parent is not writable" >&2
+  echo "Storca is missing or $app_parent is not writable" >&2
   exit 1
 fi
 
@@ -47,7 +60,7 @@ fi
 installed_version=$(plutil -extract CFBundleShortVersionString raw -o - "$info_plist")
 
 if pgrep -f "$app_path/Contents/" >/dev/null; then
-  echo 'Orca Storm is running; update deferred'
+  echo 'Storca is running; update deferred'
   exit 0
 fi
 
@@ -74,7 +87,7 @@ curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
   --output "$work_dir/release.json"
 tag=$(plutil -extract tag_name raw -o - "$work_dir/release.json")
 if [[ "$tag" == "v$installed_version" ]]; then
-  echo "Orca Storm $installed_version is current"
+  echo "Storca $installed_version is current"
   exit 0
 fi
 if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-storm\.[0-9]+$ ]]; then
@@ -83,8 +96,8 @@ if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-storm\.[0-9]+$ ]]; then
 fi
 
 case "$(uname -m)" in
-  arm64) asset_name='orca-storm-macos-arm64.dmg' ;;
-  x86_64) asset_name='orca-storm-macos-x64.dmg' ;;
+  arm64) asset_name='storca-macos-arm64.dmg' ;;
+  x86_64) asset_name='storca-macos-x64.dmg' ;;
   *) echo 'Unsupported Mac architecture' >&2; exit 1 ;;
 esac
 
@@ -116,8 +129,8 @@ hdiutil attach "$work_dir/app.dmg" -readonly -nobrowse \
   -mountpoint "$work_dir/mount" >/dev/null
 mounted=1
 stage_dir=$(mktemp -d "$app_parent/.orca-storm-stage.XXXXXX")
-ditto "$work_dir/mount/Orca Storm.app" "$stage_dir/Orca Storm.app"
-staged_info="$stage_dir/Orca Storm.app/Contents/Info.plist"
+ditto "$work_dir/mount/Storca.app" "$stage_dir/Storca.app"
+staged_info="$stage_dir/Storca.app/Contents/Info.plist"
 staged_id=$(plutil -extract CFBundleIdentifier raw -o - "$staged_info")
 staged_version=$(plutil -extract CFBundleShortVersionString raw -o - "$staged_info")
 if [[ "$staged_id" != com.ivanbrrr.orcastorm || "v$staged_version" != "$tag" ]]; then
@@ -125,11 +138,12 @@ if [[ "$staged_id" != com.ivanbrrr.orcastorm || "v$staged_version" != "$tag" ]];
   exit 1
 fi
 if pgrep -f "$app_path/Contents/" >/dev/null; then
-  echo 'Orca Storm started during download; update deferred'
+  echo 'Storca started during download; update deferred'
   exit 0
 fi
 
 rm -rf "$backup_path"
 mv "$app_path" "$backup_path"
-mv "$stage_dir/Orca Storm.app" "$app_path"
-echo "Updated Orca Storm from $installed_version to $staged_version"
+mv "$stage_dir/Storca.app" "$new_app_path"
+app_path="$new_app_path"
+echo "Updated Storca from $installed_version to $staged_version"

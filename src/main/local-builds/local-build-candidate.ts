@@ -115,11 +115,7 @@ function extractCompatibility(zipFile: FileHandle): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       '/usr/bin/unzip',
-      [
-        '-p',
-        '/dev/fd/3',
-        `Orca Storm.app/Contents/Resources/${LOCAL_BUILD_COMPATIBILITY_FILENAME}`
-      ],
+      ['-p', '/dev/fd/3', `Storca.app/Contents/Resources/${LOCAL_BUILD_COMPATIBILITY_FILENAME}`],
       { stdio: ['ignore', 'pipe', 'ignore', zipFile.fd] }
     )
     const chunks: Buffer[] = []

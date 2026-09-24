@@ -269,6 +269,19 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.linux.icon).toBe('resources/build/icon.icns')
   })
 
+  it('ships Storca without changing the existing install identity', () => {
+    expect(electronBuilderConfig.appId).toBe('com.ivanbrrr.orcastorm')
+    expect(electronBuilderConfig.productName).toBe('Storca')
+    expect(electronBuilderConfig.win.executableName).toBe('Storca')
+    expect(electronBuilderConfig.nsis.artifactName).toBe('storca-windows-setup.${ext}')
+    expect(electronBuilderConfig.dmg.artifactName).toBe('storca-macos-${arch}.${ext}')
+    expect(electronBuilderConfig.protocols[0].schemes).toEqual(['orca-storm', 'storca'])
+    expect(electronBuilderConfig.mac.extendInfo).toMatchObject({
+      CFBundleName: 'Orca Storm',
+      CFBundleDisplayName: 'Storca'
+    })
+  })
+
   it('matches the Linux desktop entry to Electron window class', () => {
     expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca-storm')
   })
@@ -276,11 +289,11 @@ describe('electron-builder config', () => {
   it('uses the release artifact set as local Linux targets without changing existing names', () => {
     expect(electronBuilderConfig.linux.target).toEqual(['AppImage', 'deb', 'rpm'])
     expect(electronBuilderConfig.toolsets).toEqual({ appimage: '1.0.3' })
-    expect(electronBuilderConfig.appImage.artifactName).toBe('orca-storm-linux.${ext}')
-    expect(electronBuilderConfig.deb.artifactName).toBe('orca-storm_${version}_${arch}.${ext}')
+    expect(electronBuilderConfig.appImage.artifactName).toBe('storca-linux.${ext}')
+    expect(electronBuilderConfig.deb.artifactName).toBe('storca_${version}_${arch}.${ext}')
     expect(electronBuilderConfig.rpm).toMatchObject({
       packageName: 'orca-storm',
-      artifactName: 'orca-storm-${version}.${arch}.${ext}'
+      artifactName: 'storca-${version}.${arch}.${ext}'
     })
   })
 
@@ -297,7 +310,7 @@ describe('electron-builder config', () => {
   it('validates each AppImage before electron-builder publishes it', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-appimage-'))
     try {
-      const appImage = join(root, 'orca-storm-linux.AppImage')
+      const appImage = join(root, 'storca-linux.AppImage')
       await writeFile(appImage, 'not an ELF')
       await chmod(appImage, 0o755)
 
@@ -318,7 +331,7 @@ describe('electron-builder config', () => {
       delete require.cache[configPath]
       process.env.ORCA_LINUX_ARM64_RELEASE = '1'
       expect(require('../electron-builder.config.cjs').appImage.artifactName).toBe(
-        'orca-storm-linux-arm64.${ext}'
+        'storca-linux-arm64.${ext}'
       )
     } finally {
       if (original === undefined) {

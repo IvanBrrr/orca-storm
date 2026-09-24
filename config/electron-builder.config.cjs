@@ -159,8 +159,8 @@ const windowsRuntimeResources = existsSync(
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca Storm',
-  protocols: [{ name: 'Orca Storm', schemes: ['orca-storm'] }],
+  productName: 'Storca',
+  protocols: [{ name: 'Storca', schemes: ['orca-storm', 'storca'] }],
   toolsets: { appimage: '1.0.3' },
   ...(stormBuildVersion
     ? { extraMetadata: { version: stormBuildVersion } }
@@ -406,7 +406,7 @@ module.exports = {
     }
   },
   win: {
-    executableName: 'Orca Storm',
+    executableName: 'Storca',
     // Storm's Windows installer is unsigned; omit publisherName so its own updates remain installable.
     signtoolOptions: {
       sign: signWindowsUninstallerViaSignPath,
@@ -436,7 +436,7 @@ module.exports = {
     ]
   },
   nsis: {
-    artifactName: 'orca-storm-windows-setup.${ext}',
+    artifactName: 'storca-windows-setup.${ext}',
     shortcutName: '${productName}',
     uninstallDisplayName: '${productName}',
     createDesktopShortcut: 'always',
@@ -462,6 +462,9 @@ module.exports = {
     entitlements: 'resources/build/entitlements.mac.plist',
     entitlementsInherit: 'resources/build/entitlements.mac.plist',
     extendInfo: {
+      // Keep the existing Keychain service name while Finder displays the new product name.
+      CFBundleName: 'Orca Storm',
+      CFBundleDisplayName: 'Storca',
       NSAppleEventsUsageDescription:
         'Orca allows terminal-launched developer tools to automate local apps when you request it.',
       NSBluetoothAlwaysUsageDescription:
@@ -541,7 +544,7 @@ module.exports = {
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
   forceCodeSigning: isMacRelease,
   dmg: {
-    artifactName: 'orca-storm-macos-${arch}.${ext}'
+    artifactName: 'storca-macos-${arch}.${ext}'
   },
   linux: {
     // Why mimeTypes and not fileAssociations: shared-mime-info already maps *.md/*.markdown to
@@ -587,11 +590,11 @@ module.exports = {
     category: 'Utility'
   },
   appImage: {
-    artifactName: isLinuxArm64Release ? 'orca-storm-linux-arm64.${ext}' : 'orca-storm-linux.${ext}'
+    artifactName: isLinuxArm64Release ? 'storca-linux-arm64.${ext}' : 'storca-linux.${ext}'
   },
   deb: {
     packageName: 'orca-storm',
-    artifactName: 'orca-storm_${version}_${arch}.${ext}',
+    artifactName: 'storca_${version}_${arch}.${ext}',
     // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
@@ -610,7 +613,7 @@ module.exports = {
   },
   rpm: {
     packageName: 'orca-storm',
-    artifactName: 'orca-storm-${version}.${arch}.${ext}',
+    artifactName: 'storca-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [

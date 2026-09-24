@@ -2,12 +2,13 @@
 set -euo pipefail
 
 if [[ "$(uname -s)" != Darwin ]]; then
-  echo 'Orca Storm updater requires macOS' >&2
+  echo 'Storca updater requires macOS' >&2
   exit 1
 fi
 
 script_dir=$(cd "$(dirname "$0")" && pwd)
-support_dir="$HOME/Library/Application Support/Orca Storm"
+support_dir="$HOME/Library/Application Support/Storca"
+legacy_script="$HOME/Library/Application Support/Orca Storm/update-storm-macos.sh"
 agent_dir="$HOME/Library/LaunchAgents"
 agent_path="$agent_dir/com.ivanbrrr.orcastorm.updater.plist"
 installed_script="$support_dir/update-storm-macos.sh"
@@ -16,8 +17,8 @@ agent_domain="gui/$(id -u)"
 
 if [[ "${1:-}" == --uninstall ]]; then
   launchctl bootout "$agent_domain" "$agent_path" >/dev/null 2>&1 || true
-  rm -f "$agent_path" "$installed_script"
-  echo 'Orca Storm scheduled updater removed'
+  rm -f "$agent_path" "$installed_script" "$legacy_script"
+  echo 'Storca scheduled updater removed'
   exit 0
 fi
 if [[ $# -ne 0 ]]; then
@@ -27,6 +28,7 @@ fi
 
 mkdir -p "$support_dir" "$agent_dir"
 install -m 700 "$script_dir/update-storm-macos.sh" "$installed_script"
+rm -f "$legacy_script"
 escaped_script=${installed_script//&/&amp;}
 escaped_script=${escaped_script//</&lt;}
 escaped_script=${escaped_script//>/&gt;}
@@ -53,4 +55,4 @@ EOF
 plutil -lint "$agent_path" >/dev/null
 launchctl bootout "$agent_domain" "$agent_path" >/dev/null 2>&1 || true
 launchctl bootstrap "$agent_domain" "$agent_path"
-echo "Orca Storm updater installed: $agent_path"
+echo "Storca updater installed: $agent_path"

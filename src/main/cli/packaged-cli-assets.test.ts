@@ -23,7 +23,7 @@ const unixLauncherFixtures = [
   {
     name: 'Linux',
     asset: linuxLauncherAsset,
-    appDir: ['Orca Storm'],
+    appDir: ['Storca'],
     launcher: ['resources', 'bin', 'orca-storm'],
     executable: ['orca-storm'],
     cli: ['resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
@@ -31,9 +31,9 @@ const unixLauncherFixtures = [
   {
     name: 'macOS',
     asset: darwinLauncherAsset,
-    appDir: ['Orca Storm.app'],
+    appDir: ['Storca.app'],
     launcher: ['Contents', 'Resources', 'bin', 'orca-storm'],
-    executable: ['Contents', 'MacOS', 'Orca Storm'],
+    executable: ['Contents', 'MacOS', 'Storca'],
     cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   }
 ] as const
@@ -196,7 +196,7 @@ server.listen(0, '127.0.0.1', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-linux-cli-'))
       try {
-        const appDir = join(root, 'Orca Storm')
+        const appDir = join(root, 'Storca')
         const resourcesDir = join(appDir, 'resources')
         const launcherDir = join(resourcesDir, 'bin')
         const cliDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'cli')
@@ -251,7 +251,7 @@ printf 'arg=%s\\n' "$@"
   itRunsUnixShell('sanitizes node env and forwards argv verbatim', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-linux-cli-env-'))
     try {
-      const appDir = join(root, 'Orca Storm')
+      const appDir = join(root, 'Storca')
       const resourcesDir = join(appDir, 'resources')
       const launcherDir = join(resourcesDir, 'bin')
       const cliDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'cli')
@@ -309,7 +309,7 @@ node -e 'console.log(JSON.stringify({
   itRunsUnixShell('keeps Linux serve on the CLI entrypoint in node mode', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-linux-cli-serve-'))
     try {
-      const appDir = join(root, 'Orca Storm')
+      const appDir = join(root, 'Storca')
       const resourcesDir = join(appDir, 'resources')
       const launcherDir = join(resourcesDir, 'bin')
       const cliDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'cli')
