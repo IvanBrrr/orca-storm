@@ -43,7 +43,8 @@ cat > "$agent_path" <<EOF
   <key>ProgramArguments</key>
   <array><string>/bin/bash</string><string>$escaped_script</string></array>
   <key>RunAtLoad</key><true/>
-  <key>StartInterval</key><integer>21600</integer>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
   <key>StandardOutPath</key><string>$escaped_log/updater.log</string>
   <key>StandardErrorPath</key><string>$escaped_log/updater-error.log</string>
 </dict>
