@@ -147,6 +147,7 @@ jobs:
           retention-days: 14
 
   release:
+    if: github.ref == 'refs/heads/main'
     needs: [identity, package]
     runs-on: ubuntu-22.04
     permissions:
