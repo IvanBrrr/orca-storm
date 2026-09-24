@@ -3,8 +3,15 @@ import {
   normalizeOptionalField,
   normalizePromptField
 } from './agent-status-field-normalization'
-import type { AgentJournalRenderItem, AgentJournalSubmission } from './agent-session-journal-types'
+import {
+  AGENT_JOURNAL_MESSAGE_SEND_MODES,
+  type AgentJournalMessageSendMode,
+  type AgentJournalRenderItem,
+  type AgentJournalSubmission,
+  type AgentJournalTurnOutcome
+} from './agent-session-journal-types'
 import { isRootAgentJournalItem } from './agent-session-journal-producer'
+import { readAgentJournalTurnOutcome } from './agent-session-turn-record'
 import {
   AGENT_STATUS_TOOL_INPUT_MAX_LENGTH,
   AGENT_STATUS_TOOL_NAME_MAX_LENGTH
@@ -12,6 +19,7 @@ import {
 import { describeToolInput } from './native-chat-tool-summary'
 import {
   activeStructuredAgentSessionTurnId,
+  newestStructuredAgentSessionTurn,
   statusStructuredAgentSessionToolCall
 } from './structured-agent-session-live-turn'
 import {
@@ -123,6 +131,10 @@ function itemBlocks(item: AgentJournalRenderItem): {
   }
 }
 
+function isAgentJournalMessageSendMode(value: string): value is AgentJournalMessageSendMode {
+  return AGENT_JOURNAL_MESSAGE_SEND_MODES.some((mode) => mode === value)
+}
+
 const projectedItems = new WeakMap<AgentJournalRenderItem, NativeChatMessage | null>()
 
 /** Deliberately NOT scoped by producer: the transcript shows every agent's
@@ -151,13 +163,16 @@ export function projectStructuredItemToNativeChat(
   }
   // Reducer updates replace journal items, so unchanged rows keep their render caches.
   const projected = itemBlocks(item)
+  const sentAs = item.body.kind === 'message' ? item.body.sentAs : undefined
   const message: NativeChatMessage | null = projected
     ? {
         id: item.itemId,
         role: projected.role,
         blocks: projected.blocks,
         timestamp: item.observedAt,
-        source: 'transcript'
+        source: 'transcript',
+        // A send mode this build cannot name renders as an ordinary message.
+        ...(sentAs !== undefined && isAgentJournalMessageSendMode(sentAs) ? { sentAs } : {})
       }
     : null
   projectedItems.set(item, message)
@@ -296,6 +311,8 @@ export type StructuredAgentSessionStatusProjection = {
   toolName?: string
   toolInput?: string
   lastAssistantMessage?: string
+  /** The newest settled turn's provider verdict; present only while `status` is idle. */
+  turnOutcome?: AgentJournalTurnOutcome
 }
 
 /** One projection shared by host and client: null status means "no turn yet", not idle.
@@ -332,12 +349,17 @@ export function projectStructuredAgentSessionStatusSummary(
     latestStructuredAgentSessionAssistantMessage(items),
     AGENT_STATUS_MAX_FIELD_LENGTH
   )
+  // A verdict is a fact about a finished turn: only an idle session has one to report, and
+  // `readAgentJournalTurnOutcome` already answers null for anything it cannot place.
+  const turnOutcome =
+    status === 'idle' ? readAgentJournalTurnOutcome(newestStructuredAgentSessionTurn(items)) : null
   return {
     status,
     latestPrompt: normalizePromptField(latestStructuredAgentSessionPrompt(items)),
     ...(toolName ? { toolName } : {}),
     ...(toolInput ? { toolInput } : {}),
-    ...(lastAssistantMessage ? { lastAssistantMessage } : {})
+    ...(lastAssistantMessage ? { lastAssistantMessage } : {}),
+    ...(turnOutcome ? { turnOutcome } : {})
   }
 }
 
