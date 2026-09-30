@@ -1905,7 +1905,8 @@
           "scopedTo": "{{value0}} visible"
         },
         "SidebarNav": {
-          "9c95e1ce91": "Agents"
+          "9c95e1ce91": "Agents",
+          "e7ad3c540d": "Open Jira tasks"
         },
         "SidebarSettingsHelpMenu": {
           "d396773ef0": "checking"
