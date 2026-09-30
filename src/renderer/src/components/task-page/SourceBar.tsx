@@ -110,7 +110,8 @@ export function TaskPageSourceBar({
                   aria-label={sourceAvailabilityNotice?.label ?? source.label}
                   aria-pressed={active}
                   className={cn(
-                    'group flex h-8 w-8 items-center justify-center rounded-md border transition',
+                    'group flex h-8 items-center justify-center rounded-md border transition',
+                    source.id === 'plane' ? 'gap-1 px-2' : 'w-8',
                     active
                       ? 'border-foreground/40 bg-muted/70 text-foreground shadow-sm'
                       : 'border-border/40 bg-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground',
@@ -118,6 +119,7 @@ export function TaskPageSourceBar({
                   )}
                 >
                   <source.Icon className="size-3.5" />
+                  {source.id === 'plane' ? <span className="text-xs">{source.label}</span> : null}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>

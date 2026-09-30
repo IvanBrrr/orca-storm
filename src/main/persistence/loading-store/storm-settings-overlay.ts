@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { normalizeVisibleTaskProviders } from '../../../shared/task-providers'
 import {
   durableWriteTempPath,
   writeFileDurableIfCurrent,
@@ -24,6 +25,29 @@ export function readStormSettings(dataFile: string): Record<string, unknown> | n
   } catch (error) {
     console.warn('[persistence] Could not read Storca settings:', error)
     return null
+  }
+}
+
+export function defaultStormTaskProviders(
+  canonicalSettings: Record<string, unknown>,
+  stormSettings: Record<string, unknown> | null
+): Record<string, unknown> {
+  if (stormSettings?.visibleTaskProvidersDefaultedForPlane === true) {
+    return stormSettings
+  }
+
+  const settings = { ...canonicalSettings, ...stormSettings }
+  const providers = normalizeVisibleTaskProviders(settings.visibleTaskProviders)
+  const visibleTaskProviders = providers.filter((provider) => provider !== 'jira')
+  if (!visibleTaskProviders.includes('plane')) {
+    visibleTaskProviders.push('plane')
+  }
+
+  return {
+    ...stormSettings,
+    visibleTaskProviders,
+    defaultTaskSource: settings.defaultTaskSource === 'jira' ? 'plane' : settings.defaultTaskSource,
+    visibleTaskProvidersDefaultedForPlane: true
   }
 }
 
