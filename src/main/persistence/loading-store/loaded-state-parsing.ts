@@ -42,7 +42,7 @@ import { hasStateBackup } from './backup-recovery-rotation'
 import { prepareLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import { normalizeLoadedProfileState } from './normalize-loaded-profile-state'
-import { readStormSettings } from './storm-settings-overlay'
+import { defaultStormTaskProviders, readStormSettings } from './storm-settings-overlay'
 
 type PersistenceStartupDetails = Record<string, unknown> | (() => Record<string, unknown>)
 
@@ -105,9 +105,11 @@ export class LoadedStateParsingOperations {
 
         if (this.runtime.stormSettingsOverlay) {
           this.runtime.canonicalSettingsRaw = structuredClone(parsed.settings)
-          const stormSettings = readStormSettings(dataFile)
-          if (stormSettings) {
-            parsed.settings = Object.assign({}, parsed.settings, stormSettings)
+          const savedStormSettings = readStormSettings(dataFile)
+          const stormSettings = defaultStormTaskProviders(parsed.settings, savedStormSettings)
+          parsed.settings = Object.assign({}, parsed.settings, stormSettings)
+          if (savedStormSettings?.visibleTaskProvidersDefaultedForPlane !== true) {
+            this.runtime.loadNeedsSave = true
           }
         }
 
@@ -217,6 +219,12 @@ export class LoadedStateParsingOperations {
       result = getDefaultPersistedState(homedir())
       if (this.runtime.stormSettingsOverlay) {
         this.runtime.canonicalSettingsRaw = structuredClone(result.settings)
+        result.settings = Object.assign(
+          {},
+          result.settings,
+          defaultStormTaskProviders(result.settings, null)
+        )
+        this.runtime.loadNeedsSave = true
       }
     }
 

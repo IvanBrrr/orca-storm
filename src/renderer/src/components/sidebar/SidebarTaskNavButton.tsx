@@ -1,6 +1,6 @@
 import React from 'react'
 import { EyeOff, Github, Gitlab, List } from 'lucide-react'
-import { JiraIcon } from '@/components/icons/JiraIcon'
+import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import {
   ContextMenu,
@@ -217,15 +217,15 @@ export function SidebarTaskNavButton(): React.JSX.Element | null {
                 <LinearIcon className="size-3.5" />
               </TaskProviderShortcut>
             ) : null}
-            {visibleTaskProviders.includes('jira') ? (
+            {visibleTaskProviders.includes('plane') ? (
               <TaskProviderShortcut
                 label={translate(
-                  'auto.components.sidebar.SidebarNav.e7ad3c540d',
-                  'Open Jira tasks'
+                  'auto.components.sidebar.SidebarNav.openPlaneTasks',
+                  'Open Plane tasks'
                 )}
-                onOpen={() => openTaskPage({ taskSource: 'jira' })}
+                onOpen={() => openTaskPage({ taskSource: 'plane' })}
               >
-                <JiraIcon className="size-3.5" />
+                <PlaneIcon className="size-3.5" />
               </TaskProviderShortcut>
             ) : null}
           </span>

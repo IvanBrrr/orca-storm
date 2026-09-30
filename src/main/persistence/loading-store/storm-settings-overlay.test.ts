@@ -80,3 +80,38 @@ it('persists Storm settings through the asynchronous flush path', async () => {
   )
   expect(new Store({ dataFile, stormSettingsOverlay: true }).getSettings().theme).toBe('dark')
 })
+
+it('shows Plane on a new Storca profile', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'orca-storm-new-plane-'))
+  dirs.push(dir)
+  const storm = new Store({ dataFile: join(dir, 'orca-data.json'), stormSettingsOverlay: true })
+  expect(storm.getSettings().visibleTaskProviders).toContain('plane')
+  expect(storm.getSettings().visibleTaskProviders).not.toContain('jira')
+})
+
+it('shows Plane in place of Jira without changing the shared Orca settings', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'orca-storm-plane-default-'))
+  dirs.push(dir)
+  const dataFile = join(dir, 'orca-data.json')
+  const official = new Store({ dataFile, stormSettingsOverlay: false })
+  official.updateSettings({
+    visibleTaskProviders: ['github', 'gitlab', 'linear', 'jira'],
+    defaultTaskSource: 'jira'
+  })
+  official.flush()
+
+  const storm = new Store({ dataFile, stormSettingsOverlay: true })
+  expect(storm.getSettings().visibleTaskProviders).toEqual(['github', 'gitlab', 'linear', 'plane'])
+  expect(storm.getSettings().defaultTaskSource).toBe('plane')
+  storm.flush()
+
+  expect(
+    new Store({ dataFile, stormSettingsOverlay: false }).getSettings().visibleTaskProviders
+  ).toEqual(['github', 'gitlab', 'linear', 'jira'])
+  const stormAgain = new Store({ dataFile, stormSettingsOverlay: true })
+  stormAgain.updateSettings({ visibleTaskProviders: ['github'], defaultTaskSource: 'github' })
+  stormAgain.flush()
+  expect(
+    new Store({ dataFile, stormSettingsOverlay: true }).getSettings().visibleTaskProviders
+  ).toEqual(['github'])
+})
