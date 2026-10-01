@@ -2,7 +2,7 @@
 // RPC leaves nothing behind, and that a pending rewind persisted by an older build never strands
 // the chat: the next attach resumes by session id and settles the rewind as refused.
 
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,8 +20,10 @@ import {
   hostTestOperationId,
   resetHostTestOperationIds
 } from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
-import { AgentSessionRecordStore } from './agent-session-record-store'
+import type { AgentSessionRecordStore } from './agent-session-record-store'
+import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
 import { createStructuredClaudeRuntimeAdapter } from './structured-claude-runtime-adapter'
+import { openTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 
 const caller = { callerKey: 'desktop' }
 const PROVIDER_SESSION_ID = claudeSessionIdForOrcaSession(HOST_TEST_SESSION)
@@ -67,6 +69,10 @@ const fence = (): number => store.getRecord(HOST_TEST_SESSION)!.lease.runtimeFen
 /** What an older build left behind: an admitted rewind whose outcome was never recorded. */
 async function seedPendingRewind(phase: 'prepared' | 'provider-succeeded') {
   const request = rewindParams(fence())
+  // A rewind had a turn to target, so Claude had written the transcript a resume continues.
+  const projects = join(directory, 'claude-home', 'projects', 'workspace')
+  await mkdir(projects, { recursive: true })
+  await writeFile(join(projects, `${PROVIDER_SESSION_ID}.jsonl`), '')
   await store.admitMutationOperation({
     callerKey: caller.callerKey,
     envelope: request.envelope,
@@ -94,17 +100,14 @@ async function seedPendingRewind(phase: 'prepared' | 'provider-succeeded') {
 }
 
 async function reattach() {
-  await host.close(HOST_TEST_SESSION)
+  await host.close(HOST_TEST_SESSION, 'evict')
   expect(await host.attach(caller, attachParams(fence()))).toMatchObject({ ok: true })
 }
 
 beforeEach(async () => {
   resetHostTestOperationIds()
   directory = await mkdtemp(join(tmpdir(), 'orca-claude-pending-rewind-'))
-  store = await AgentSessionRecordStore.open({
-    directory: join(directory, 'store'),
-    hostId: 'local'
-  })
+  store = await openTestAgentSessionRecordStore(directory)
   claude = fakeClaude({ initSessionId: PROVIDER_SESSION_ID })
   adapter = createStructuredClaudeRuntimeAdapter({
     store,
@@ -113,7 +116,7 @@ beforeEach(async () => {
     resolveClaudeAuthPolicy: () => ({ stripAuthEnv: false }),
     openClaudeConnection: claude.openConnection,
     readProcessStartTime: async () => HOST_TEST_NOW,
-    onUnexpectedExit: () => {}
+    onLifecycleEvent: () => {}
   })
   host = new StructuredAgentSessionHost({
     store,
@@ -121,7 +124,7 @@ beforeEach(async () => {
     adapter: new StructuredAgentSessionAdapterRouter({ claude: adapter, codex: adapter }, () =>
       adapter.closeAll()
     ),
-    journalRoot: directory,
+    journalDatabase: openTestJournalHostDatabase(directory),
     claimKeyId: 'key',
     now: () => HOST_TEST_NOW,
     probeOwner: async () => ({ outcome: 'exit-observed' })

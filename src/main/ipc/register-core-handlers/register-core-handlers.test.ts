@@ -34,10 +34,10 @@ const {
   registerOrcaProfileHandlersMock,
   registerCodexAccountHandlersMock,
   registerAgentHookHandlersMock,
-  registerAgentTrustHandlersMock,
   registerClaudeAccountHandlersMock,
   registerMiniMaxCredentialsHandlersMock,
   registerGrokAccountHandlersMock,
+  registerCursorAccountHandlersMock,
   registerClipboardHandlersMock,
   setTrustedClipboardRendererWebContentsIdMock,
   registerUpdaterHandlersMock,
@@ -102,10 +102,10 @@ const {
   registerOrcaProfileHandlersMock: vi.fn(),
   registerCodexAccountHandlersMock: vi.fn(),
   registerAgentHookHandlersMock: vi.fn(),
-  registerAgentTrustHandlersMock: vi.fn(),
   registerClaudeAccountHandlersMock: vi.fn(),
   registerMiniMaxCredentialsHandlersMock: vi.fn(),
   registerGrokAccountHandlersMock: vi.fn(),
+  registerCursorAccountHandlersMock: vi.fn(),
   registerClipboardHandlersMock: vi.fn(),
   setTrustedClipboardRendererWebContentsIdMock: vi.fn(),
   registerUpdaterHandlersMock: vi.fn(),
@@ -330,10 +330,6 @@ vi.mock('../agent-hooks', () => ({
   registerAgentHookHandlers: registerAgentHookHandlersMock
 }))
 
-vi.mock('../agent-trust', () => ({
-  registerAgentTrustHandlers: registerAgentTrustHandlersMock
-}))
-
 vi.mock('../claude-accounts', () => ({
   registerClaudeAccountHandlers: registerClaudeAccountHandlersMock
 }))
@@ -344,6 +340,10 @@ vi.mock('../minimax-credentials', () => ({
 
 vi.mock('../grok-accounts', () => ({
   registerGrokAccountHandlers: registerGrokAccountHandlersMock
+}))
+
+vi.mock('../cursor-accounts', () => ({
+  registerCursorAccountHandlers: registerCursorAccountHandlersMock
 }))
 
 vi.mock('../../window/attach-main-window-services', () => ({
@@ -400,7 +400,14 @@ vi.mock('../native-chat', () => ({
   registerNativeChatHandlers: registerNativeChatHandlersMock
 }))
 
+import { agentSessionRefusalError } from '../../../shared/agent-session-wire-refusals'
+import { recordStructuredAgentSessionHostInstallRefusal } from '../../runtime/structured-agent-session-host-refusal'
 import { registerCoreHandlers } from './register-core-handlers'
+
+let registeredAiVaultOptions: {
+  ensureStructuredSessionOwnership: () => Promise<void>
+}
+let registeredRuntime: { ensureStructuredAgentSessionHost: ReturnType<typeof vi.fn> } | undefined
 
 describe('registerCoreHandlers', () => {
   beforeEach(() => {
@@ -438,7 +445,6 @@ describe('registerCoreHandlers', () => {
     registerOrcaProfileHandlersMock.mockReset()
     registerCodexAccountHandlersMock.mockReset()
     registerAgentHookHandlersMock.mockReset()
-    registerAgentTrustHandlersMock.mockReset()
     registerClaudeAccountHandlersMock.mockReset()
     registerMiniMaxCredentialsHandlersMock.mockReset()
     registerClipboardHandlersMock.mockReset()
@@ -472,7 +478,11 @@ describe('registerCoreHandlers', () => {
 
   it('passes the store through to handler registrars that need it', async () => {
     const store = { marker: 'store' }
-    const runtime = { marker: 'runtime', getAgentBrowserBridge: () => null }
+    const runtime = {
+      marker: 'runtime',
+      getAgentBrowserBridge: () => null,
+      ensureStructuredAgentSessionHost: vi.fn()
+    }
     const stats = { marker: 'stats' }
     const claudeUsage = { marker: 'claudeUsage' }
     const codexUsage = { marker: 'codexUsage' }
@@ -508,6 +518,9 @@ describe('registerCoreHandlers', () => {
 
     const aiVaultOptions = registerAiVaultHandlersMock.mock.calls[0]?.[0]
     expect(aiVaultOptions).toBeDefined()
+    // Registration happens once per module: later tests reach these handlers through here.
+    registeredAiVaultOptions = aiVaultOptions
+    registeredRuntime = runtime
 
     callRuntimeEnvironmentMock.mockResolvedValueOnce({
       ok: true,
@@ -535,6 +548,7 @@ describe('registerCoreHandlers', () => {
     expect(registerClaudeAccountHandlersMock).toHaveBeenCalledWith(claudeAccounts)
     expect(registerMiniMaxCredentialsHandlersMock).toHaveBeenCalledWith(rateLimits)
     expect(registerGrokAccountHandlersMock).toHaveBeenCalled()
+    expect(registerCursorAccountHandlersMock).toHaveBeenCalled()
     expect(registerRateLimitHandlersMock).toHaveBeenCalledWith(rateLimits, codexAccounts)
     expect(registerGitHubHandlersMock).toHaveBeenCalledWith(store, stats)
     expect(registerLinearHandlersMock).toHaveBeenCalled()
@@ -560,7 +574,7 @@ describe('registerCoreHandlers', () => {
     expect(registerLocalhostWorktreeLabelHandlersMock).toHaveBeenCalledWith(store)
     expect(registerTelemetryHandlersMock).toHaveBeenCalledWith(store)
     expect(registerOrcaProfileHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
-    expect(registerSessionHandlersMock).toHaveBeenCalledWith(store)
+    expect(registerSessionHandlersMock).toHaveBeenCalledWith(store, runtime)
     expect(registerUIHandlersMock).toHaveBeenCalledWith(store, {
       isDashboardPopoutRenderer: isDashboardPopoutRendererMock
     })
@@ -645,6 +659,31 @@ describe('registerCoreHandlers', () => {
       'aiVault.prepareSessionResume',
       prepareArgs
     )
+  })
+
+  // Session history and terminal resume are not chats: the refusal chats get leaves them no host
+  // to check, and any other host failure still fails them.
+  it('serves session history while chats are refused', async () => {
+    const aiVaultOptions = registeredAiVaultOptions
+    expect(aiVaultOptions).toBeDefined()
+    const refusal = agentSessionRefusalError(
+      'agent_session_journal_unreadable',
+      { reason: 'journalCorrupt' },
+      'Unable to load this chat.'
+    )
+    recordStructuredAgentSessionHostInstallRefusal(refusal)
+    try {
+      registeredRuntime?.ensureStructuredAgentSessionHost.mockRejectedValueOnce(refusal)
+      await expect(aiVaultOptions.ensureStructuredSessionOwnership()).resolves.toBeUndefined()
+      registeredRuntime?.ensureStructuredAgentSessionHost.mockRejectedValueOnce(
+        new Error('the record store would not open')
+      )
+      await expect(aiVaultOptions.ensureStructuredSessionOwnership()).rejects.toThrow(
+        'the record store would not open'
+      )
+    } finally {
+      recordStructuredAgentSessionHostInstallRefusal(null)
+    }
   })
 
   it('only registers IPC handlers once but always updates web contents id', () => {

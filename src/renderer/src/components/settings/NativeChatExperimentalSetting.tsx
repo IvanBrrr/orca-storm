@@ -2,6 +2,7 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { translate } from '@/i18n/i18n'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { NativeChatQueueFollowUpsSetting } from './NativeChatQueueFollowUpsSetting'
 import { NativeChatShellEnvironmentSetting } from './NativeChatShellEnvironmentSetting'
 import { NativeChatSupportedAgents } from './NativeChatSupportedAgents'
 import { SearchableSetting } from './SearchableSetting'
@@ -168,7 +169,7 @@ export function NativeChatExperimentalSetting({
                 <p className="text-xs text-muted-foreground">
                   {translate(
                     'auto.components.settings.ExperimentalPane.nativeChat.resumeCopy',
-                    'When Orca quits or installs an update, chats that were mid-turn are automatically resumed when Orca is reopened.'
+                    'When Orca quits or installs an update, chats that were working are automatically resumed when Orca is reopened.'
                   )}
                 </p>
               </div>
@@ -183,6 +184,10 @@ export function NativeChatExperimentalSetting({
                 }
               />
             </div>
+          ) : null}
+
+          {structuredChatActive ? (
+            <NativeChatQueueFollowUpsSetting settings={settings} updateSettings={updateSettings} />
           ) : null}
 
           {structuredChatActive ? (
