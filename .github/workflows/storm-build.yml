@@ -132,6 +132,18 @@ jobs:
           if [[ "${ORCA_STORM_MAC_SIGNED:-}" != 1 ]]; then
             find dist -maxdepth 1 -type f \( -name 'latest-mac.yml' -o -name '*.zip' -o -name '*.zip.blockmap' \) -delete
           fi
+      - name: Verify macOS app seals
+        if: matrix.target == 'mac'
+        shell: bash
+        run: |
+          apps=()
+          while IFS= read -r -d '' app; do
+            apps+=("$app")
+          done < <(find dist -maxdepth 2 -type d -name Storca.app -print0)
+          test "${#apps[@]}" -eq 2
+          for app in "${apps[@]}"; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: storm-${{ matrix.artifact }}

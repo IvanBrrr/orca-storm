@@ -494,6 +494,8 @@ module.exports = {
     include: resolve(__dirname, 'nsis', 'orca-installer-hooks.nsh')
   },
   mac: {
+    // Seal the whole bundle even without Developer ID credentials; otherwise Gatekeeper calls it damaged.
+    identity: isMacRelease ? undefined : '-',
     // Why rank Alternate: Orca joins Finder's "Open With" list for Markdown without claiming
     // LSHandlerRank ownership, so whichever editor the user already prefers stays the default.
     // Why one entry per extension: app-builder-lib globs `*.${ext}`, which an array would break.

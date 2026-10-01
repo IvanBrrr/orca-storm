@@ -53,6 +53,7 @@ describe('electron-builder mac channel config', () => {
       expect(config.mac.appId).toBeUndefined()
       expect(config.appId).toBe('com.ivanbrrr.orcastorm')
       expect(config.mac.hardenedRuntime).toBe(true)
+      expect(config.mac.identity).toBeUndefined()
       expect(config.forceCodeSigning).toBe(true)
     })
   })

@@ -365,6 +365,10 @@ describe('electron-builder config', () => {
     })
   })
 
+  it('ad-hoc signs unsigned macOS bundles so their resources have a valid seal', () => {
+    expect(electronBuilderConfig.mac.identity).toBe('-')
+  })
+
   it('matches the Linux desktop entry to Electron window class', () => {
     expect(electronBuilderConfig.linux.desktop.entry.StartupWMClass).toBe('orca-storm')
   })
