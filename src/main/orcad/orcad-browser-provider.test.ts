@@ -176,17 +176,28 @@ describe('ExternalChromiumBrowserProcess', () => {
 
 describe('cross-platform browser provider paths', () => {
   it('resolves installed Electron launchers on macOS, Linux, and Windows', () => {
+    expect(installedElectronCandidates('darwin', '/Users/test', {})[0]).toBe(
+      '/Applications/Storca.app/Contents/MacOS/Storca'
+    )
     expect(installedElectronCandidates('darwin', '/Users/test', {})).toContain(
       '/Users/test/Applications/Orca.app/Contents/MacOS/Orca'
     )
     expect(installedElectronCandidates('linux', '/home/test', {})).toContain(
       '/home/test/.local/bin/orca-ide'
     )
+    expect(installedElectronCandidates('linux', '/home/test', {})[0]).toBe(
+      '/home/test/.local/bin/orca-storm'
+    )
     expect(
       installedElectronCandidates('win32', 'C:\\Users\\test', {
         LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local'
       })
     ).toContain('C:\\Users\\test\\AppData\\Local\\Programs\\Orca\\Orca.exe')
+    expect(
+      installedElectronCandidates('win32', 'C:\\Users\\test', {
+        LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local'
+      })[0]
+    ).toBe('C:\\Users\\test\\AppData\\Local\\Programs\\Storca\\Storca.exe')
   })
 
   it('uses platform-specific bundled agent-browser names', () => {

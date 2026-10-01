@@ -9,6 +9,7 @@ import {
   type ClaudeAgentTeamsMode
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
+import { getBundledLauncherPath } from '../cli/bundled-cli-launcher-path'
 import { resolvePathEnvKey } from '../pty/windows-path-segment-merge'
 
 export type ClaudeAgentTeamsLaunchPlan = {
@@ -79,6 +80,10 @@ export function resolveClaudeAgentTeamsShimBin(
   }
   return (
     findExecutableOnPath(process.platform === 'win32' ? 'orca-dev.cmd' : 'orca-dev', pathValue) ??
+    findExecutableOnPath(
+      process.platform === 'win32' ? 'orca-storm.exe' : 'orca-storm',
+      pathValue
+    ) ??
     findExecutableOnPath(getOrcaCliCommandNameForPlatform(process.platform), pathValue)
   )
 }
@@ -91,16 +96,7 @@ function bundledLauncherPath(): string | null {
   if (!process.resourcesPath) {
     return null
   }
-  if (process.platform === 'darwin') {
-    return join(process.resourcesPath, 'bin', 'orca')
-  }
-  if (process.platform === 'linux') {
-    return join(process.resourcesPath, 'bin', 'orca-ide')
-  }
-  if (process.platform === 'win32') {
-    return join(process.resourcesPath, 'bin', 'orca.exe')
-  }
-  return null
+  return getBundledLauncherPath(process.platform, process.resourcesPath)
 }
 
 function findExecutableOnPath(command: string, pathValue: string | undefined): string | null {

@@ -65,6 +65,8 @@ export function installedElectronCandidates(
   const joinPath = platform === 'win32' ? win32.join : posix.join
   if (platform === 'darwin') {
     return [
+      '/Applications/Storca.app/Contents/MacOS/Storca',
+      joinPath(homePath, 'Applications', 'Storca.app', 'Contents', 'MacOS', 'Storca'),
       '/Applications/Orca.app/Contents/MacOS/Orca',
       joinPath(homePath, 'Applications', 'Orca.app', 'Contents', 'MacOS', 'Orca')
     ]
@@ -72,12 +74,24 @@ export function installedElectronCandidates(
   if (platform === 'win32') {
     return [
       ...(environment.LOCALAPPDATA
-        ? [joinPath(environment.LOCALAPPDATA, 'Programs', 'Orca', 'Orca.exe')]
+        ? [
+            joinPath(environment.LOCALAPPDATA, 'Programs', 'Storca', 'Storca.exe'),
+            joinPath(environment.LOCALAPPDATA, 'Programs', 'Orca', 'Orca.exe')
+          ]
         : []),
-      ...(environment.ProgramFiles ? [joinPath(environment.ProgramFiles, 'Orca', 'Orca.exe')] : [])
+      ...(environment.ProgramFiles
+        ? [
+            joinPath(environment.ProgramFiles, 'Storca', 'Storca.exe'),
+            joinPath(environment.ProgramFiles, 'Orca', 'Orca.exe')
+          ]
+        : [])
     ]
   }
   return [
+    joinPath(homePath, '.local', 'bin', 'orca-storm'),
+    '/usr/local/bin/orca-storm',
+    '/usr/bin/orca-storm',
+    '/opt/Storca/orca-storm',
     joinPath(homePath, '.local', 'bin', 'orca-ide'),
     '/usr/local/bin/orca-ide',
     '/usr/bin/orca-ide',

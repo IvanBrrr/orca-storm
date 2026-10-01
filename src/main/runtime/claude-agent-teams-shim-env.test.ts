@@ -96,6 +96,21 @@ describe('claude agent teams shim env', () => {
     expect(resolveClaudeAgentTeamsShimBin({ PATH: root })).toBe(cliPath)
   })
 
+  it('prefers the Storca CLI when both editions are on PATH', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'storca-agent-teams-cli-'))
+    roots.push(root)
+    const stormName = process.platform === 'win32' ? 'orca-storm.exe' : 'orca-storm'
+    const officialName = process.platform === 'win32' ? 'orca.cmd' : 'orca'
+    for (const name of [stormName, officialName]) {
+      const path = join(root, name)
+      await writeFile(path, '#!/usr/bin/env sh\n', 'utf8')
+      if (process.platform !== 'win32') {
+        await chmod(path, 0o755)
+      }
+    }
+    expect(resolveClaudeAgentTeamsShimBin({ PATH: root })).toBe(join(root, stormName))
+  })
+
   it('refuses to resolve a CLI through relative PATH entries or a bare override', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-agent-teams-cli-'))
     roots.push(root)
