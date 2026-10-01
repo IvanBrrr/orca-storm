@@ -156,6 +156,77 @@ describe('getWorkItemByKey', () => {
 })
 
 describe('listWorkItems', () => {
+  it('filters on Plane before paging so matching rows beyond the first project page are found', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ ...rawWorkItem(301), assignees: [{ id: 'alice', display_name: 'Alice' }] }],
+          next_cursor: 'later',
+          has_more: true,
+          pagination: { style: 'cursor' }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ ...rawWorkItem(302), assignees: [{ id: 'alice', display_name: 'Alice' }] }],
+          has_more: false,
+          pagination: { style: 'cursor' }
+        })
+      )
+    const { listWorkItems } = await loadWorkItems()
+    const result = await listWorkItems(client, project, {
+      maxItems: 250,
+      filters: { assigneeId: 'alice', labelIds: ['red', 'blue'], stateId: 'todo', priority: 'high' }
+    })
+    expect(result.items.map((item) => item.key)).toEqual(['PROJ-301', 'PROJ-302'])
+    expect(result.truncated).toBe(false)
+    const url = new URL(requestedUrls()[0])
+    expect(url.pathname).toBe('/api/v2/workspaces/acme/projects/p-1/work-items/')
+    expect(url.searchParams.get('assignee_id')).toBe('alice')
+    expect(url.searchParams.get('label_id__in')).toBe('red,blue')
+    expect(url.searchParams.get('state_id')).toBe('todo')
+    expect(url.searchParams.get('priority')).toBe('high')
+    expect(requestedUrls()[1]).toContain('cursor=later')
+  })
+
+  it('accepts Plane v2 offset pages when a deployment does not enable cursor paging', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [rawWorkItem(1)],
+          next: 1,
+          pagination: { style: 'offset' }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [rawWorkItem(2)],
+          next: null,
+          pagination: { style: 'offset' }
+        })
+      )
+    const { listWorkItems } = await loadWorkItems()
+    const result = await listWorkItems(client, project, { filters: {} })
+    expect(result.items.map((item) => item.key)).toEqual(['PROJ-1', 'PROJ-2'])
+    expect(requestedUrls()[1]).toContain('offset=1')
+  })
+
+  it('preserves the v1 list on Plane deployments without a v2 work item endpoint', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Not found' }, 404))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          results: [rawWorkItem(1)],
+          next_page_results: false
+        })
+      )
+    const { listWorkItems } = await loadWorkItems()
+    const result = await listWorkItems(client, project, { filters: { assigneeId: 'alice' } })
+    expect(result.items.map((item) => item.key)).toEqual(['PROJ-1'])
+    expect(result.serverFiltered).toBeUndefined()
+    expect(requestedUrls()[1]).toContain('/api/v1/')
+  })
+
   it('follows the cursor and maps every page', async () => {
     netFetchMock
       .mockResolvedValueOnce(

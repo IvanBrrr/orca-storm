@@ -48,7 +48,8 @@ export const PLANE_STATE_GROUPS = [
   'unstarted',
   'started',
   'completed',
-  'cancelled'
+  'cancelled',
+  'triage'
 ] as const
 
 export type PlaneStateGroup = (typeof PLANE_STATE_GROUPS)[number]
@@ -107,6 +108,15 @@ export type PlaneWorkItem = {
   targetDate?: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type PlaneWorkItemListFilters = {
+  search?: string
+  stateId?: string
+  assigneeId?: string
+  priority?: PlanePriority
+  unassigned?: boolean
+  labelIds?: string[]
 }
 
 // The workspace search endpoint returns a lite projection, not a full work

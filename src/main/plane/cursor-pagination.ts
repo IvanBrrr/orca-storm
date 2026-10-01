@@ -51,3 +51,41 @@ export async function listAllPages(
   }
   return { items, truncated: true }
 }
+
+export async function listAllV2Pages(
+  fetchPage: (cursor: string | undefined, offset: number | undefined) => Promise<unknown>,
+  maxItems: number
+): Promise<PlanePageResult> {
+  const items: unknown[] = []
+  let cursor: string | undefined
+  let offset: number | undefined
+  for (let page = 0; page < DEFAULT_MAX_PAGES; page++) {
+    const payload = await fetchPage(cursor, offset)
+    if (!isPlaneJsonRecord(payload) || !Array.isArray(payload.data)) {
+      throw new Error('Plane returned an invalid work item page.')
+    }
+    items.push(...payload.data)
+    const pagination = isPlaneJsonRecord(payload.pagination) ? payload.pagination : {}
+    const offsetPage = pagination.style === 'offset'
+    const nextOffset = typeof payload.next === 'number' ? payload.next : undefined
+    const hasMore = offsetPage ? nextOffset !== undefined : payload.has_more === true
+    if (items.length >= maxItems) {
+      return { items: items.slice(0, maxItems), truncated: hasMore || items.length > maxItems }
+    }
+    if (!hasMore) {
+      return { items, truncated: false }
+    }
+    if (offsetPage) {
+      if (nextOffset === undefined || nextOffset === offset) {
+        throw new Error('Plane returned an invalid work item offset.')
+      }
+      offset = nextOffset
+    } else {
+      if (typeof payload.next_cursor !== 'string' || payload.next_cursor === cursor) {
+        throw new Error('Plane returned an invalid work item cursor.')
+      }
+      cursor = payload.next_cursor
+    }
+  }
+  return { items, truncated: true }
+}

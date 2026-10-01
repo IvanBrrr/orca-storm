@@ -31,6 +31,14 @@ export const planeApi = {
     workspaceId?: string
     orderBy?: string
     limit?: number
+    filters?: {
+      search?: string
+      stateId?: string
+      assigneeId?: string
+      priority?: string
+      unassigned?: boolean
+      labelIds?: string[]
+    }
   }) => ipcRenderer.invoke('plane:listWorkItems', args),
 
   getWorkItem: (args: { key: string; workspaceId?: string; project?: unknown }) =>

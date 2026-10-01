@@ -54,7 +54,7 @@ export class RuntimePlaneCommands {
   }
 
   planeListWorkItems(
-    args: PlaneProjectScope & { orderBy?: string; limit?: number }
+    args: Parameters<typeof planeListWorkItems>[0]
   ): ReturnType<typeof planeListWorkItems> {
     return planeListWorkItems(args)
   }

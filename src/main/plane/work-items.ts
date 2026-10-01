@@ -5,6 +5,7 @@ import type {
   PlaneLabel,
   PlaneMember,
   PlaneProject,
+  PlaneWorkItemListFilters,
   PlaneState,
   PlaneWorkItem,
   PlaneWorkItemSearchResult
@@ -18,16 +19,15 @@ import {
 } from './authenticated-request'
 import { PLANE_PAGE_SIZE, listAllPages } from './cursor-pagination'
 import { planeHtmlToText } from './description-markdown'
+import { listFilteredWorkItems } from './filtered-work-items'
 import {
   findProjectByIdentifier,
   listLabels,
   listStates,
   listWorkspaceMembers
 } from './project-metadata'
-import { mapPlaneMember, mapPlaneWorkItem } from './work-item-mapping'
+import { mapPlaneMember, mapPlaneWorkItem, PLANE_WORK_ITEM_EXPAND } from './work-item-mapping'
 
-// Plane returns bare ids for these unless expansion is requested.
-const WORK_ITEM_EXPAND = 'state,assignees,labels'
 const WORK_ITEM_LIST_MAX = 250
 const SEARCH_LIMIT = 20
 
@@ -35,6 +35,8 @@ export type PlaneWorkItemList = {
   items: PlaneWorkItem[]
   /** True when the read stopped at a bound; callers should say so in the UI. */
   truncated: boolean
+  /** Older hosts omit this, so clients can retain their loaded-only warning. */
+  serverFiltered?: boolean
 }
 
 export function parsePlaneWorkItemKey(
@@ -68,7 +70,7 @@ export async function getWorkItemByKey(
   const raw = await planeRequest(
     client,
     `${workspacePath(client.workspace, `work-items/${encodeURIComponent(parsed.projectIdentifier)}-${parsed.sequenceId}/`)}${buildQuery(
-      { expand: WORK_ITEM_EXPAND }
+      { expand: PLANE_WORK_ITEM_EXPAND }
     )}`
   ).catch((error: unknown) => {
     if (error instanceof PlaneApiError && error.status === 404) {
@@ -148,7 +150,7 @@ export async function getWorkItem(
   const raw = await planeRequest(
     client,
     `${workspacePath(client.workspace, `projects/${encodeURIComponent(project.id)}/work-items/${encodeURIComponent(workItemId)}/`)}${buildQuery(
-      { expand: WORK_ITEM_EXPAND }
+      { expand: PLANE_WORK_ITEM_EXPAND }
     )}`
   )
   return mapWithFallback(client, project, raw)
@@ -157,8 +159,21 @@ export async function getWorkItem(
 export async function listWorkItems(
   client: PlaneClientForWorkspace,
   project: PlaneProject,
-  options: { orderBy?: string; maxItems?: number } = {}
+  options: { orderBy?: string; maxItems?: number; filters?: PlaneWorkItemListFilters } = {}
 ): Promise<PlaneWorkItemList> {
+  if (options.filters) {
+    try {
+      return await listFilteredWorkItems(client, project, {
+        filters: options.filters,
+        orderBy: options.orderBy,
+        maxItems: options.maxItems ?? WORK_ITEM_LIST_MAX
+      })
+    } catch (error) {
+      if (!(error instanceof PlaneApiError && [404, 405, 501].includes(error.status ?? 0))) {
+        throw error
+      }
+    }
+  }
   const { items, truncated } = await listAllPages(
     (cursor) =>
       planeRequest(
@@ -166,7 +181,7 @@ export async function listWorkItems(
         `${workspacePath(client.workspace, `projects/${encodeURIComponent(project.id)}/work-items/`)}${buildQuery(
           {
             per_page: PLANE_PAGE_SIZE,
-            expand: WORK_ITEM_EXPAND,
+            expand: PLANE_WORK_ITEM_EXPAND,
             order_by: options.orderBy ?? '-updated_at',
             ...(cursor ? { cursor } : {})
           }

@@ -1,5 +1,6 @@
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown } from 'lucide-react'
 import type {
+  PlaneLabel,
   PlaneMember,
   PlanePriority,
   PlaneState,
@@ -7,7 +8,15 @@ import type {
 } from '../../../shared/plane-types'
 import { PLANE_PRIORITIES } from '../../../shared/plane-types'
 import { Button } from '@/components/ui/button'
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -16,6 +25,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import type { PlaneSortField, PlaneWorkItemView } from './plane-work-item-view'
 
@@ -65,26 +75,41 @@ function priorityLabel(priority: PlanePriority): string {
 
 export function TaskPagePlaneControls({
   items,
+  states,
+  assignees,
+  labels,
   view,
   onViewChange
 }: {
   items: PlaneWorkItem[]
+  states: PlaneState[]
+  assignees: PlaneMember[]
+  labels: PlaneLabel[]
   view: PlaneWorkItemView
   onViewChange: (view: PlaneWorkItemView) => void
 }): React.JSX.Element {
-  const states = new Map<string, PlaneState>()
-  const assignees = new Map<string, PlaneMember>()
+  const [labelsOpen, setLabelsOpen] = useState(false)
+  const [labelSearch, setLabelSearch] = useState('')
+  const stateMap = new Map<string, PlaneState>(states.map((state) => [state.id, state]))
+  const assigneeMap = new Map<string, PlaneMember>(assignees.map((member) => [member.id, member]))
+  const labelMap = new Map<string, PlaneLabel>(labels.map((label) => [label.id, label]))
   for (const item of items) {
-    states.set(item.state.id, item.state)
+    stateMap.set(item.state.id, item.state)
     for (const assignee of item.assignees) {
-      assignees.set(assignee.id, assignee)
+      assigneeMap.set(assignee.id, assignee)
+    }
+    for (const label of item.labels) {
+      labelMap.set(label.id, label)
     }
   }
-  const stateOptions = [...states.values()].sort((left, right) =>
+  const stateOptions = [...stateMap.values()].sort((left, right) =>
     left.name.localeCompare(right.name)
   )
-  const assigneeOptions = [...assignees.values()].sort((left, right) =>
+  const assigneeOptions = [...assigneeMap.values()].sort((left, right) =>
     left.displayName.localeCompare(right.displayName)
+  )
+  const labelOptions = [...labelMap.values()].sort((left, right) =>
+    left.name.localeCompare(right.name)
   )
   const sortByLabel = translate('auto.components.TaskPagePlaneControls.sortBy', 'Sort by')
   const directionLabel =
@@ -99,7 +124,7 @@ export function TaskPagePlaneControls({
           type="search"
           aria-label={translate(
             'auto.components.TaskPagePlaneControls.search',
-            'Search loaded work items'
+            'Search work items'
           )}
           placeholder={translate(
             'auto.components.TaskPagePlaneControls.searchPlaceholder',
@@ -129,6 +154,66 @@ export function TaskPagePlaneControls({
           ))}
         </SelectContent>
       </Select>
+      <Popover open={labelsOpen} onOpenChange={setLabelsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            role="combobox"
+            aria-expanded={labelsOpen}
+            aria-label={translate('auto.components.TaskPagePlaneControls.labels', 'Labels')}
+            className="w-36 justify-between"
+          >
+            {view.labelIds.length
+              ? `${translate('auto.components.TaskPagePlaneControls.labels', 'Labels')} (${view.labelIds.length})`
+              : translate('auto.components.TaskPagePlaneControls.allLabels', 'All labels')}
+            <ChevronsUpDown className="size-3.5 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder={translate(
+                'auto.components.TaskPagePlaneControls.searchLabels',
+                'Search labels'
+              )}
+              value={labelSearch}
+              onValueChange={setLabelSearch}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {translate('auto.components.TaskPagePlaneControls.noLabels', 'No labels found')}
+              </CommandEmpty>
+              {labelOptions
+                .filter((label) =>
+                  label.name.toLocaleLowerCase().includes(labelSearch.toLocaleLowerCase())
+                )
+                .map((label) => (
+                  <CommandItem
+                    key={label.id}
+                    value={label.id}
+                    onSelect={() =>
+                      onViewChange({
+                        ...view,
+                        labelIds: view.labelIds.includes(label.id)
+                          ? view.labelIds.filter((id) => id !== label.id)
+                          : [...view.labelIds, label.id]
+                      })
+                    }
+                  >
+                    <Check
+                      className={
+                        view.labelIds.includes(label.id) ? 'size-3.5' : 'size-3.5 opacity-0'
+                      }
+                    />
+                    {label.name}
+                  </CommandItem>
+                ))}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
       <Select
         value={view.assigneeId}
         onValueChange={(assigneeId) => onViewChange({ ...view, assigneeId })}

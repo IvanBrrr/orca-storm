@@ -1,4 +1,4 @@
-import type { PlaneWorkItem } from '../../../shared/plane-types'
+import { isPlanePriority, type PlaneWorkItem } from '../../../shared/plane-types'
 
 export type PlaneSortField =
   | 'updated'
@@ -15,6 +15,7 @@ export type PlaneWorkItemView = {
   stateId: string
   assigneeId: string
   priority: string
+  labelIds: string[]
   sortField: PlaneSortField
   sortDirection: PlaneSortDirection
 }
@@ -36,6 +37,31 @@ export function planeWorkItemOrderBy(view: PlaneWorkItemView): string {
   return '-updated_at'
 }
 
+export function planeWorkItemFilters(
+  view: Pick<PlaneWorkItemView, 'search' | 'stateId' | 'assigneeId' | 'priority' | 'labelIds'>
+): {
+  search?: string
+  stateId?: string
+  assigneeId?: string
+  priority?: PlaneWorkItem['priority']
+  unassigned?: boolean
+  labelIds?: string[]
+} {
+  const search = view.search.trim()
+  return {
+    ...(search ? { search } : {}),
+    ...(view.stateId !== 'all' ? { stateId: view.stateId } : {}),
+    ...(view.assigneeId === 'unassigned' ? { unassigned: true } : {}),
+    ...(view.assigneeId !== 'all' && view.assigneeId !== 'unassigned'
+      ? { assigneeId: view.assigneeId }
+      : {}),
+    ...(view.priority !== 'all' && isPlanePriority(view.priority)
+      ? { priority: view.priority }
+      : {}),
+    ...(view.labelIds.length ? { labelIds: view.labelIds } : {})
+  }
+}
+
 export function selectPlaneWorkItems(
   items: PlaneWorkItem[],
   view: PlaneWorkItemView
@@ -49,6 +75,9 @@ export function selectPlaneWorkItems(
       return false
     }
     if (view.priority !== 'all' && item.priority !== view.priority) {
+      return false
+    }
+    if (view.labelIds.length && !item.labels.some((label) => view.labelIds.includes(label.id))) {
       return false
     }
     if (view.assigneeId === 'unassigned' && item.assignees.length > 0) {
@@ -72,7 +101,11 @@ export function selectPlaneWorkItems(
         result = left.createdAt.localeCompare(right.createdAt)
         break
       case 'updated':
-        result = left.updatedAt.localeCompare(right.updatedAt)
+        result =
+          left.updatedAt && right.updatedAt ? left.updatedAt.localeCompare(right.updatedAt) : 0
+        if (!left.updatedAt && !right.updatedAt) {
+          return 0
+        }
         break
       case 'priority':
         result = PRIORITY_ORDER[left.priority] - PRIORITY_ORDER[right.priority]

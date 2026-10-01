@@ -8,6 +8,7 @@ import type {
   PlaneProject,
   PlaneState,
   PlaneWorkItem,
+  PlaneWorkItemListFilters,
   PlaneWorkItemSearchResult,
   PlaneWorkItemUpdate
 } from '../../shared/plane-types'
@@ -88,12 +89,13 @@ export function planeListMembers(workspaceId?: string): Promise<PlaneMember[]> {
 }
 
 export function planeListWorkItems(
-  args: PlaneProjectScope & { orderBy?: string; limit?: number }
+  args: PlaneProjectScope & { orderBy?: string; limit?: number; filters?: PlaneWorkItemListFilters }
 ): Promise<PlaneWorkItemList> {
   return withClient(args.workspaceId, (client) =>
     listWorkItems(client, args.project, {
       ...(args.orderBy ? { orderBy: args.orderBy } : {}),
-      ...(args.limit === undefined ? {} : { maxItems: args.limit })
+      ...(args.limit === undefined ? {} : { maxItems: args.limit }),
+      ...(args.filters ? { filters: args.filters } : {})
     })
   )
 }

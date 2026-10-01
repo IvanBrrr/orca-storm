@@ -16,6 +16,7 @@ const view: PlaneWorkItemView = {
   stateId: 'all',
   assigneeId: 'all',
   priority: 'all',
+  labelIds: [],
   sortField: 'updated',
   sortDirection: 'desc'
 }
@@ -41,11 +42,18 @@ describe('TaskPagePlaneControls', () => {
     const onViewChange = vi.fn()
     render(
       <TooltipProvider>
-        <TaskPagePlaneControls items={[item]} view={view} onViewChange={onViewChange} />
+        <TaskPagePlaneControls
+          items={[item]}
+          states={[]}
+          assignees={[]}
+          labels={[]}
+          view={view}
+          onViewChange={onViewChange}
+        />
       </TooltipProvider>
     )
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search loaded work items' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search work items' }), {
       target: { value: 'DEV-12' }
     })
     expect(onViewChange).toHaveBeenCalledWith({ ...view, search: 'DEV-12' })
@@ -59,5 +67,43 @@ describe('TaskPagePlaneControls', () => {
     expect(screen.getByRole('combobox', { name: 'Sort by' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Descending' }))
     expect(onViewChange).toHaveBeenCalledWith({ ...view, sortDirection: 'asc' })
+  })
+
+  it('selects several labels without closing the picker', async () => {
+    const user = userEvent.setup()
+    const onViewChange = vi.fn()
+    const labels = [
+      { id: 'backend', name: 'Backend' },
+      { id: 'urgent', name: 'Urgent' }
+    ]
+    const { rerender } = render(
+      <TooltipProvider>
+        <TaskPagePlaneControls
+          items={[item]}
+          states={[]}
+          assignees={[]}
+          labels={labels}
+          view={view}
+          onViewChange={onViewChange}
+        />
+      </TooltipProvider>
+    )
+    await user.click(screen.getByRole('combobox', { name: 'Labels' }))
+    await user.click(screen.getByRole('option', { name: 'Backend' }))
+    expect(onViewChange).toHaveBeenLastCalledWith({ ...view, labelIds: ['backend'] })
+    rerender(
+      <TooltipProvider>
+        <TaskPagePlaneControls
+          items={[item]}
+          states={[]}
+          assignees={[]}
+          labels={labels}
+          view={{ ...view, labelIds: ['backend'] }}
+          onViewChange={onViewChange}
+        />
+      </TooltipProvider>
+    )
+    await user.click(screen.getByRole('option', { name: 'Urgent' }))
+    expect(onViewChange).toHaveBeenLastCalledWith({ ...view, labelIds: ['backend', 'urgent'] })
   })
 })

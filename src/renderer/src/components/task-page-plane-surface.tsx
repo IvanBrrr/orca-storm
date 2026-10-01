@@ -5,16 +5,26 @@ import { PlaneIcon } from '@/components/icons/PlaneIcon'
 import { PlaneConnectDialog } from '@/components/plane-connect-dialog'
 import { TaskPagePlaneControls } from '@/components/task-page-plane-controls'
 import { TaskPagePlaneWorkItemList } from '@/components/task-page-plane-work-item-list'
+import { usePlaneTaskMetadata } from '@/components/use-plane-task-metadata'
 import {
   loadPlaneDefaultProjectId,
   resolvePlaneProjectId,
-  savePlaneDefaultProjectId
+  savePlaneDefaultProjectId,
+  savePlaneRecentProjectId
 } from '@/components/plane-default-project-storage'
 import {
   planeWorkItemOrderBy,
+  planeWorkItemFilters,
   selectPlaneWorkItems,
   type PlaneWorkItemView
 } from '@/components/plane-work-item-view'
+import {
+  defaultPlaneWorkItemView,
+  loadPlaneWorkItemLimit,
+  loadPlaneWorkItemView,
+  savePlaneWorkItemLimit,
+  savePlaneWorkItemView
+} from '@/components/plane-work-item-view-storage'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -109,21 +119,23 @@ function PlaneWorkspaceWorkItems({
     loadPlaneDefaultProjectId(workspaceId)
   )
   const [items, setItems] = useState<PlaneWorkItem[]>([])
+  const { states, members, labels } = usePlaneTaskMetadata(settings, workspaceId, projectId)
   const [truncated, setTruncated] = useState(false)
+  const [serverFiltered, setServerFiltered] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshNonce, setRefreshNonce] = useState(0)
   const [limit, setLimit] = useState(250)
-  const [view, setView] = useState<PlaneWorkItemView>({
-    search: '',
-    stateId: 'all',
-    assigneeId: 'all',
-    priority: 'all',
-    sortField: 'updated',
-    sortDirection: 'desc'
-  })
+  const [view, setView] = useState<PlaneWorkItemView>(defaultPlaneWorkItemView)
+  const [debouncedSearch, setDebouncedSearch] = useState(view.search)
   const project = projects.find((entry) => entry.id === projectId)
   const orderBy = planeWorkItemOrderBy(view)
+  const { stateId, assigneeId, priority, labelIds } = view
+  const filters = useMemo(
+    () =>
+      planeWorkItemFilters({ stateId, assigneeId, priority, labelIds, search: debouncedSearch }),
+    [stateId, assigneeId, priority, labelIds, debouncedSearch]
+  )
   const visibleItems = useMemo(() => selectPlaneWorkItems(items, view), [items, view])
 
   useEffect(() => {
@@ -136,7 +148,12 @@ function PlaneWorkspaceWorkItems({
           return
         }
         setProjects(next)
-        setProjectId((current) => resolvePlaneProjectId(next, current, workspaceId))
+        const selected = resolvePlaneProjectId(next, '', workspaceId)
+        setProjectId(selected)
+        const savedView = loadPlaneWorkItemView(workspaceId, selected)
+        setView(savedView)
+        setDebouncedSearch(savedView.search)
+        setLimit(loadPlaneWorkItemLimit(workspaceId, selected))
       })
       .catch((cause) => {
         if (cancelled) {
@@ -157,6 +174,11 @@ function PlaneWorkspaceWorkItems({
   }, [settings, workspaceId])
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(view.search), 350)
+    return () => clearTimeout(timer)
+  }, [view.search])
+
+  useEffect(() => {
     if (!project) {
       return
     }
@@ -165,11 +187,12 @@ function PlaneWorkspaceWorkItems({
     let cancelled = false
     setLoading(true)
     setError(null)
-    void planeListWorkItems(settings, { project, limit, orderBy })
+    void planeListWorkItems(settings, { project, workspaceId, limit, orderBy, filters })
       .then((result) => {
         if (!cancelled) {
           setItems(result.items)
           setTruncated(result.truncated)
+          setServerFiltered(result.serverFiltered === true)
         }
       })
       .catch((cause) => {
@@ -193,22 +216,36 @@ function PlaneWorkspaceWorkItems({
     return () => {
       cancelled = true
     }
-  }, [project, refreshNonce, settings, limit, orderBy])
+  }, [project, refreshNonce, settings, limit, orderBy, filters, workspaceId])
 
   const changeProject = (nextProjectId: string): void => {
     setItems([])
     setTruncated(false)
-    setLimit(250)
+    setLimit(loadPlaneWorkItemLimit(workspaceId, nextProjectId))
     setProjectId(nextProjectId)
+    const savedView = loadPlaneWorkItemView(workspaceId, nextProjectId)
+    setView(savedView)
+    setDebouncedSearch(savedView.search)
+    savePlaneRecentProjectId(workspaceId, nextProjectId)
   }
 
   const changeView = (next: PlaneWorkItemView): void => {
-    if (planeWorkItemOrderBy(next) !== orderBy) {
+    if (
+      planeWorkItemOrderBy(next) !== orderBy ||
+      JSON.stringify(planeWorkItemFilters({ ...next, search: '' })) !==
+        JSON.stringify(planeWorkItemFilters({ ...view, search: '' }))
+    ) {
       setItems([])
       setTruncated(false)
       setLimit(250)
+      if (projectId) {
+        savePlaneWorkItemLimit(workspaceId, projectId, 250)
+      }
     }
     setView(next)
+    if (projectId) {
+      savePlaneWorkItemView(workspaceId, projectId, next)
+    }
   }
 
   const toggleDefaultProject = (): void => {
@@ -276,7 +313,14 @@ function PlaneWorkspaceWorkItems({
           </Button>
         </div>
       </div>
-      <TaskPagePlaneControls items={items} view={view} onViewChange={changeView} />
+      <TaskPagePlaneControls
+        items={items}
+        states={states}
+        assignees={members}
+        labels={labels}
+        view={view}
+        onViewChange={changeView}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         {error ? (
           <p className="border-b border-border p-4 text-sm text-destructive">{error}</p>
@@ -292,7 +336,7 @@ function PlaneWorkspaceWorkItems({
             {items.length
               ? translate(
                   'auto.components.TaskPagePlaneSurface.noMatches',
-                  'No loaded work items match these filters.'
+                  'No work items match these filters.'
                 )
               : translate(
                   'auto.components.TaskPagePlaneSurface.empty',
@@ -306,12 +350,17 @@ function PlaneWorkspaceWorkItems({
               {limit >= MAX_LOADED_ITEMS
                 ? translate(
                     'auto.components.TaskPagePlaneSurface.loadLimit',
-                    'Showing the first 2,000 work items. Narrow the list in Plane to see more.'
+                    'Showing the first 2,000 matching work items. Narrow the filters to see more.'
                   )
-                : translate(
-                    'auto.components.TaskPagePlaneSurface.loadedOnly',
-                    'Filters and sorting apply to loaded work items.'
-                  )}
+                : serverFiltered
+                  ? translate(
+                      'auto.components.TaskPagePlaneSurface.sortLoadedOnly',
+                      'Sorting applies to loaded work items.'
+                    )
+                  : translate(
+                      'auto.components.TaskPagePlaneSurface.loadedOnly',
+                      'This connection filters and sorts loaded work items only.'
+                    )}
             </span>
             {limit < MAX_LOADED_ITEMS ? (
               <Button
@@ -319,7 +368,15 @@ function PlaneWorkspaceWorkItems({
                 size="sm"
                 variant="outline"
                 disabled={loading}
-                onClick={() => setLimit((current) => Math.min(current + 250, MAX_LOADED_ITEMS))}
+                onClick={() =>
+                  setLimit((current) => {
+                    const next = Math.min(current + 250, MAX_LOADED_ITEMS)
+                    if (projectId) {
+                      savePlaneWorkItemLimit(workspaceId, projectId, next)
+                    }
+                    return next
+                  })
+                }
               >
                 {loading
                   ? translate('auto.components.TaskPagePlaneSurface.loadingMore', 'Loading…')

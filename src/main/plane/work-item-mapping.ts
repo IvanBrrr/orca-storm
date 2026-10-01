@@ -13,6 +13,9 @@ import {
 } from '../../shared/plane-types'
 import { planeHtmlToText } from './description-markdown'
 
+// Plane returns bare ids for these unless expansion is requested.
+export const PLANE_WORK_ITEM_EXPAND = 'state,assignees,labels'
+
 export type PlaneWorkItemMappingContext = {
   workspace: PlaneWorkspace
   project: PlaneProject

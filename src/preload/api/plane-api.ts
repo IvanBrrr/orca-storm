@@ -11,6 +11,7 @@ import type {
   PlaneState,
   PlaneViewer,
   PlaneWorkItem,
+  PlaneWorkItemListFilters,
   PlaneWorkItemSearchResult,
   PlaneWorkItemUpdate,
   PlaneWorkspace,
@@ -41,8 +42,8 @@ export type PlaneApi = {
   listMembers: (args?: { workspaceId?: string }) => Promise<PlaneMember[]>
 
   listWorkItems: (
-    args: ProjectScoped & { orderBy?: string; limit?: number }
-  ) => Promise<{ items: PlaneWorkItem[]; truncated: boolean }>
+    args: ProjectScoped & { orderBy?: string; limit?: number; filters?: PlaneWorkItemListFilters }
+  ) => Promise<{ items: PlaneWorkItem[]; truncated: boolean; serverFiltered?: boolean }>
   getWorkItem: (args: {
     key: string
     workspaceId?: string

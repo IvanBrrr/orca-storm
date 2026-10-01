@@ -11,6 +11,7 @@ import type {
   PlaneState,
   PlaneViewer,
   PlaneWorkItem,
+  PlaneWorkItemListFilters,
   PlaneWorkItemSearchResult,
   PlaneWorkItemUpdate,
   PlaneWorkspace,
@@ -136,8 +137,14 @@ export function planeListMembers(
 
 export function planeListWorkItems(
   settings: RuntimePlaneSettings,
-  args: { project: PlaneProject; workspaceId?: string; orderBy?: string; limit?: number }
-): Promise<{ items: PlaneWorkItem[]; truncated: boolean }> {
+  args: {
+    project: PlaneProject
+    workspaceId?: string
+    orderBy?: string
+    limit?: number
+    filters?: PlaneWorkItemListFilters
+  }
+): Promise<{ items: PlaneWorkItem[]; truncated: boolean; serverFiltered?: boolean }> {
   return call(settings, 'plane.listWorkItems', args, () => window.api.plane.listWorkItems(args))
 }
 

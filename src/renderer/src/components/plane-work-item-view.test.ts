@@ -11,6 +11,7 @@ const defaultView: PlaneWorkItemView = {
   stateId: 'all',
   assigneeId: 'all',
   priority: 'all',
+  labelIds: [],
   sortField: 'updated',
   sortDirection: 'desc'
 }

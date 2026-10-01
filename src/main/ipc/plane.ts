@@ -16,7 +16,11 @@ import {
 } from '../plane/provider-operations'
 import { CancellableProviderRequests } from './cancellable-provider-requests'
 import { isPlanePriority } from '../../shared/plane-types'
-import type { PlaneProject, PlaneWorkItemUpdate } from '../../shared/plane-types'
+import type {
+  PlaneProject,
+  PlaneWorkItemListFilters,
+  PlaneWorkItemUpdate
+} from '../../shared/plane-types'
 
 const searchRequests = new CancellableProviderRequests()
 
@@ -146,11 +150,27 @@ export function registerPlaneHandlers(): void {
 
   ipcMain.handle('plane:listWorkItems', async (_event, args: Record<string, unknown>) => {
     const orderBy = normalizeId(args.orderBy)
+    const rawFilters = isPlaneJsonRecord(args.filters) ? args.filters : null
+    const filters: PlaneWorkItemListFilters | undefined = rawFilters
+      ? {
+          ...(normalizeId(rawFilters.search) ? { search: normalizeId(rawFilters.search) } : {}),
+          ...(normalizeId(rawFilters.stateId) ? { stateId: normalizeId(rawFilters.stateId) } : {}),
+          ...(normalizeId(rawFilters.assigneeId)
+            ? { assigneeId: normalizeId(rawFilters.assigneeId) }
+            : {}),
+          ...(isPlanePriority(rawFilters.priority) ? { priority: rawFilters.priority } : {}),
+          ...(rawFilters.unassigned === true ? { unassigned: true } : {}),
+          ...(Array.isArray(rawFilters.labelIds)
+            ? { labelIds: normalizeIdArray(rawFilters.labelIds) }
+            : {})
+        }
+      : undefined
     return planeListWorkItems({
       project: requireProject(args.project, 'list Plane work items'),
       workspaceId: normalizeId(args.workspaceId),
       ...(orderBy ? { orderBy } : {}),
-      limit: clampLimit(args.limit, 100, 250)
+      ...(filters ? { filters } : {}),
+      limit: clampLimit(args.limit, 100, 2000)
     })
   })
 

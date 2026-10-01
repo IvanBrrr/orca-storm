@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   loadPlaneDefaultProjectId,
   resolvePlaneProjectId,
-  savePlaneDefaultProjectId
+  savePlaneDefaultProjectId,
+  savePlaneRecentProjectId
 } from './plane-default-project-storage'
 
 describe('Plane default project', () => {
@@ -28,5 +29,15 @@ describe('Plane default project', () => {
     expect(resolvePlaneProjectId(projects, '', 'workspace-a')).toBe('preferred')
     expect(resolvePlaneProjectId(projects, 'first', 'workspace-a')).toBe('first')
     expect(resolvePlaneProjectId(projects.slice(0, 1), '', 'workspace-a')).toBe('first')
+  })
+
+  it('returns to the last selected project after reopening Tasks', () => {
+    const projects = [
+      { id: 'default', identifier: 'D', name: 'Default' },
+      { id: 'recent', identifier: 'R', name: 'Recent' }
+    ]
+    savePlaneDefaultProjectId('workspace-a', 'default')
+    savePlaneRecentProjectId('workspace-a', 'recent')
+    expect(resolvePlaneProjectId(projects, '', 'workspace-a')).toBe('recent')
   })
 })

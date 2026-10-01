@@ -42,7 +42,17 @@ export const ProjectScope = z.object({
 
 export const ListWorkItems = ProjectScope.extend({
   orderBy: OptionalString,
-  limit: boundedLimit(250)
+  limit: boundedLimit(2000),
+  filters: z
+    .object({
+      search: OptionalString,
+      stateId: OptionalString,
+      assigneeId: OptionalString,
+      priority: z.enum(PLANE_PRIORITIES).optional(),
+      unassigned: z.boolean().optional(),
+      labelIds: z.array(z.string()).optional()
+    })
+    .optional()
 })
 
 export const GetWorkItem = z.object({

@@ -283,9 +283,10 @@ export async function requestWithCredentials(
 export async function planeRequest(
   client: PlaneClientForWorkspace,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  version: 'v1' | 'v2' = 'v1'
 ): Promise<unknown> {
-  const url = `${client.workspace.baseUrl}${API_PREFIX}/${path.replace(/^\/+/, '')}`
+  const url = `${client.workspace.baseUrl}/api/${version}/${path.replace(/^\/+/, '')}`
   return execute(rateLimitBudgetKey(client.apiToken), url, client.apiToken, init, 0)
 }
 
