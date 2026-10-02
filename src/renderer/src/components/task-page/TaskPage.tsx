@@ -5,12 +5,19 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { WorkMonitor } from '../work-monitor/WorkMonitor'
 import TaskListPage from './TaskListPage'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { X } from 'lucide-react'
+import { useTaskPageEscape } from './use-task-page-escape'
 
 type WorkView = 'attention' | 'team' | 'tasks'
 
 export default function TaskPage(): React.JSX.Element {
   useTranslation()
   const pageData = useAppStore((s) => s.taskPageData)
+  const closeTaskPage = useAppStore((s) => s.closeTaskPage)
+  const activeModal = useAppStore((s) => s.activeModal)
+  useTaskPageEscape(activeModal, closeTaskPage)
   const hasExplicitTarget = Object.keys(pageData).length > 0
   const [view, setView] = useState<WorkView>(hasExplicitTarget ? 'tasks' : 'attention')
   useEffect(() => {
@@ -26,7 +33,22 @@ export default function TaskPage(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col bg-background text-foreground">
       <Tabs value={view} onValueChange={changeView} className="min-h-0 flex-1">
-        <div className="px-5 py-3 md:px-8">
+        <div className="flex items-center gap-3 px-5 py-3 md:px-8">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={closeTaskPage}
+                aria-label={translate('auto.components.TaskPage.1a06219d5c', 'Close tasks')}
+              >
+                <X className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {translate('auto.components.TaskPage.4826fd1ad8', 'Close · Esc')}
+            </TooltipContent>
+          </Tooltip>
           <TabsList aria-label={translate('workMonitor.views', 'Work views')}>
             <TabsTrigger value="attention">
               {translate('workMonitor.attention', 'My attention')}
