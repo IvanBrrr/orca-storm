@@ -56,7 +56,7 @@ export function WorkMonitorAccountPicker({
           id="work-monitor-login"
           value={logins[account.key] ?? ''}
           onChange={(event) => onChange(account.key, event.target.value)}
-          placeholder="octocat"
+          placeholder={translate('workMonitor.loginPlaceholder', 'GitHub login')}
           autoComplete="off"
         />
       </div>

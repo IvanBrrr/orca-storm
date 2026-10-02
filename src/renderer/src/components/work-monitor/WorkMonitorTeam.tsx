@@ -83,7 +83,9 @@ export function WorkMonitorTeam({
                       {person.name}
                     </Button>
                     <span className="ml-2 text-xs text-muted-foreground">
-                      {person.id.startsWith('github:') ? (person.host ?? 'GitHub') : 'Plane'}
+                      {person.id.startsWith('github:')
+                        ? (person.host ?? translate('workMonitor.githubLabel', 'GitHub'))
+                        : translate('workMonitor.planeLabel', 'Plane')}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{countLane('working')}</td>

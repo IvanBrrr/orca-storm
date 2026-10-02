@@ -18764,6 +18764,11 @@
     "removePath": "Remove {{name}}"
   },
   "workMonitor": {
+    "loginPlaceholder": "GitHub login",
+    "prNumber": "PR #{{number}}",
+    "planeLabel": "Plane",
+    "githubLabel": "GitHub",
+    "ciLabel": "CI",
     "views": "Work views",
     "attention": "My attention",
     "team": "Team",

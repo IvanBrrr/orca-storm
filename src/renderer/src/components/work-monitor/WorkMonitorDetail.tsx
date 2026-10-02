@@ -59,7 +59,9 @@ export function WorkMonitorDetail({
             </section>
             {row.plane ? (
               <section className="space-y-2 border-t border-border pt-4">
-                <h3 className="text-sm font-medium">{row.plane.key} · Plane</h3>
+                <h3 className="text-sm font-medium">
+                  {row.plane.key} · {translate('workMonitor.planeLabel', 'Plane')}
+                </h3>
                 <p className="text-xs">
                   {row.plane.project.name} · {row.plane.state.name}
                 </p>
@@ -92,7 +94,8 @@ export function WorkMonitorDetail({
             {row.prs.map((pr) => (
               <section key={pr.url} className="space-y-2 border-t border-border pt-4">
                 <h3 className="text-sm font-medium">
-                  PR #{pr.number} · {pr.title}
+                  {translate('workMonitor.prNumber', 'PR #{{number}}', { number: pr.number })} ·{' '}
+                  {pr.title}
                 </h3>
                 <p className="text-xs">
                   {pr.author} · {pr.state}
@@ -104,7 +107,9 @@ export function WorkMonitorDetail({
                   <dd>
                     {pr.reviewDecision ?? translate('workMonitor.unavailable', 'Not available')}
                   </dd>
-                  <dt className="text-muted-foreground">CI</dt>
+                  <dt className="text-muted-foreground">
+                    {translate('workMonitor.ciLabel', 'CI')}
+                  </dt>
                   <dd>
                     {pr.checksSummary?.state ??
                       translate('workMonitor.unavailable', 'Not available')}

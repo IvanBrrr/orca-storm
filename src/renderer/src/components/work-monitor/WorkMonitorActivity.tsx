@@ -80,7 +80,8 @@ export function WorkMonitorActivity({ row }: { row: MonitorRow }): React.JSX.Ele
             {current.comments.slice(0, 8).map(({ prUrl, number, comment }) => (
               <li key={`${prUrl}:${comment.id}`} className="space-y-1 text-xs">
                 <p>
-                  {comment.author} · PR #{number} ·{' '}
+                  {comment.author} ·{' '}
+                  {translate('workMonitor.prNumber', 'PR #{{number}}', { number })} ·{' '}
                   {formatUiRelativeTimeFromDate(comment.createdAt)}
                 </p>
                 <p className="line-clamp-3 whitespace-pre-wrap break-words text-muted-foreground">

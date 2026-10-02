@@ -36,8 +36,8 @@ export function WorkMonitorRows({
           <span className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
             {row.prs.map((pr) => (
               <span key={pr.url}>
-                PR #{pr.number} · {pr.state} ·{' '}
-                {pr.prRepo ? `${pr.prRepo.owner}/${pr.prRepo.repo}` : pr.author}
+                {translate('workMonitor.prNumber', 'PR #{{number}}', { number: pr.number })} ·{' '}
+                {pr.state} · {pr.prRepo ? `${pr.prRepo.owner}/${pr.prRepo.repo}` : pr.author}
               </span>
             ))}
             <span>
