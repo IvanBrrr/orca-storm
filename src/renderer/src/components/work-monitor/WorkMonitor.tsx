@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -28,6 +27,8 @@ import {
   normalizeTaskRepoSelection
 } from '../task-page-default-repo-selection'
 import { useWorkMonitorData } from './use-work-monitor-data'
+import { useWorkMonitorAccounts } from './use-work-monitor-accounts'
+import { WorkMonitorAccountPicker } from './WorkMonitorAccountPicker'
 import {
   buildMonitorRows,
   personalMonitorLane,
@@ -72,22 +73,15 @@ export function WorkMonitor({ view }: { view: 'attention' | 'team' }): React.JSX
   const workspaceScope = `${runtimeId ?? 'local'}::${status.selectedWorkspaceId ?? status.activeWorkspaceId ?? ''}`
   const [projectSelection, setProjectSelection] = useState({ scope: '', id: 'all' })
   const projectId = projectSelection.scope === workspaceScope ? projectSelection.id : 'all'
-  const { data, loading, refresh, githubLogin, changeLogin } = useWorkMonitorData(
-    selectedRepos,
-    status,
-    projectId,
-    checking
-  )
+  const { data, loading, refresh } = useWorkMonitorData(selectedRepos, status, projectId, checking)
+  const { scopes, logins, githubAccounts, changeLogin } = useWorkMonitorAccounts(selectedRepos)
   const [connectOpen, setConnectOpen] = useState(false)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const identity = useMemo(
-    () => ({ githubLogin, planeId: status.viewer?.id ?? null }),
-    [githubLogin, status.viewer?.id]
+    () => ({ githubAccounts, planeViewerIds: data?.planeViewerIds ?? {} }),
+    [githubAccounts, data?.planeViewerIds]
   )
-  const rows = useMemo(
-    () => buildMonitorRows(data?.github ?? [], data?.plane ?? [], identity),
-    [data, identity]
-  )
+  const rows = useMemo(() => buildMonitorRows(data?.github ?? [], data?.plane ?? []), [data])
   const selectedRow = rows.find((row) => row.id === selectedRowId) ?? null
   const projects = data?.projects ?? []
   const errors = [...new Set([...(error ? [error] : []), ...(data?.errors ?? [])])]
@@ -136,18 +130,7 @@ export function WorkMonitor({ view }: { view: 'attention' | 'team' }): React.JSX
               {translate('workMonitor.connectPlane', 'Connect Plane')}
             </Button>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="work-monitor-login">
-              {translate('workMonitor.myLogin', 'My GitHub login')}
-            </Label>
-            <Input
-              id="work-monitor-login"
-              value={githubLogin}
-              onChange={(event) => changeLogin(event.target.value)}
-              placeholder="octocat"
-              autoComplete="off"
-            />
-          </div>
+          <WorkMonitorAccountPicker scopes={scopes} logins={logins} onChange={changeLogin} />
         </div>
         <Button
           variant="outline"
@@ -183,11 +166,11 @@ export function WorkMonitor({ view }: { view: 'attention' | 'team' }): React.JSX
               : ''}
         </span>
       </div>
-      {!githubLogin && view === 'attention' ? (
+      {scopes.some((scope) => !logins[scope.key]) && view === 'attention' ? (
         <p className="text-xs text-muted-foreground">
           {translate(
-            'workMonitor.identityHint',
-            'Enter your GitHub login to see your author and reviewer queues. Plane uses your connected account.'
+            'workMonitor.scopedIdentityHint',
+            'Set your GitHub login for each account source. Plane identity is verified separately for each workspace.'
           )}
         </p>
       ) : null}

@@ -8,7 +8,12 @@ test('work monitor renders personal turns, linked details and team queues', asyn
   seededRepoPath
 }, testInfo) => {
   const updatedAt = new Date().toISOString()
-  const project = { id: 'monitor-project', identifier: 'DEV', name: 'Development' }
+  const project = {
+    id: 'monitor-project',
+    identifier: 'DEV',
+    name: 'Development',
+    workspaceId: 'plane-workspace'
+  }
   const tasks: PlaneWorkItem[] = [42, 43, 44].map((number) => ({
     id: `task-${number}`,
     key: `DEV-${number}`,
@@ -64,6 +69,7 @@ test('work monitor renders personal turns, linked details and team queues', asyn
         'gh:viewer',
         'gh:workItem',
         'plane:status',
+        'plane:testConnection',
         'plane:listProjects',
         'plane:listWorkItems'
       ]) {
@@ -76,7 +82,13 @@ test('work monitor renders personal turns, linked details and team queues', asyn
       )
       ipcMain.handle('plane:status', () => ({
         connected: true,
-        viewer: { id: 'plane-alice', displayName: 'Alice' }
+        viewer: { id: 'plane-workspace', displayName: 'Workspace', email: null },
+        activeWorkspaceId: 'plane-workspace',
+        selectedWorkspaceId: 'plane-workspace'
+      }))
+      ipcMain.handle('plane:testConnection', () => ({
+        ok: true,
+        viewer: { id: 'plane-alice', displayName: 'Alice', email: null }
       }))
       ipcMain.handle('plane:listProjects', () => [project])
       ipcMain.handle('plane:listWorkItems', () => ({ items: tasks, truncated: false }))
@@ -163,7 +175,7 @@ test('work monitor renders personal turns, linked details and team queues', asyn
   const aliceRow = table
     .getByRole('row')
     .filter({ has: orcaPage.getByRole('button', { name: 'alice', exact: true }) })
-  await expect(aliceRow.getByRole('cell')).toHaveText(['aliceGitHub', '1', '3', '1', '1'])
+  await expect(aliceRow.getByRole('cell')).toHaveText(['aliceGitHub', '0', '3', '1', '1'])
   await table.getByRole('button', { name: 'bob', exact: true }).click({ force: true })
   await expect(orcaPage.getByRole('button', { name: /Review terminal rendering/ })).toBeVisible()
   await orcaPage.screenshot({

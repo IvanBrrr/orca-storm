@@ -41,7 +41,7 @@ describe('monitor detailed PR states', () => {
       mergeable: 'CONFLICTING'
     })
     const result = await loadMonitorReviewState([pr], [repo])
-    const [row] = buildMonitorRows(result.items, [], { githubLogin: 'alice', planeId: null })
+    const [row] = buildMonitorRows(result.items, [])
     expect(row.actions.map((a) => a.reason)).toEqual(['changes', 'conflict'])
     expect(lookupByRepo).toHaveBeenCalledWith(
       expect.objectContaining({

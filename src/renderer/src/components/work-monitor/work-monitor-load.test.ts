@@ -2,18 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
 import type { PlaneProject, PlaneWorkItem } from '../../../../shared/plane-types'
 import { loadMonitorSnapshot } from './work-monitor-load'
+import { buildMonitorRows, personalMonitorLane } from './work-monitor-model'
 
-const { fetchAcross, listProjects, listItems } = vi.hoisted(() => ({
+const { fetchAcross, listProjects, listItems, testConnection } = vi.hoisted(() => ({
   fetchAcross: vi.fn(),
   listProjects: vi.fn(),
-  listItems: vi.fn()
+  listItems: vi.fn(),
+  testConnection: vi.fn()
 }))
 vi.mock('@/store', () => ({
   useAppStore: { getState: () => ({ fetchWorkItemsAcrossRepos: fetchAcross }) }
 }))
 vi.mock('@/runtime/runtime-plane-client', () => ({
   planeListProjects: listProjects,
-  planeListWorkItems: listItems
+  planeListWorkItems: listItems,
+  planeTestConnection: testConnection
 }))
 
 const repo: Repo = {
@@ -51,9 +54,72 @@ beforeEach(() => {
   fetchAcross.mockResolvedValue({ items: [], failedCount: 0, githubUnavailable: false })
   listProjects.mockResolvedValue(projects)
   listItems.mockResolvedValue({ items: [], truncated: false })
+  testConnection.mockResolvedValue({
+    ok: true,
+    viewer: { id: 'actual-user', displayName: 'Alice', email: null }
+  })
 })
 
 describe('monitor snapshot loading', () => {
+  it('uses the actual user read rather than the workspace projection in status', async () => {
+    listProjects.mockResolvedValue([projects[0]])
+    const assigned = { ...task, assignees: [{ id: 'actual-user', displayName: 'Alice' }] }
+    listItems.mockResolvedValue({ items: [assigned], truncated: false })
+    const result = await loadMonitorSnapshot(
+      [],
+      { activeRuntimeEnvironmentId: 'remote' },
+      {
+        connected: true,
+        viewer: { id: 'workspace-hash', displayName: 'Workspace', email: null },
+        activeWorkspaceId: 'workspace-0'
+      },
+      'all'
+    )
+    expect(testConnection).toHaveBeenCalledWith(
+      { activeRuntimeEnvironmentId: 'remote' },
+      { workspaceId: 'workspace-0' }
+    )
+    const identity = { githubAccounts: {}, planeViewerIds: result.planeViewerIds }
+    const [working] = buildMonitorRows([], result.plane)
+    expect(personalMonitorLane(working, identity, 'working')).toBe(true)
+    const [finished] = buildMonitorRows(
+      [
+        {
+          id: 'pr',
+          type: 'pr',
+          number: 1,
+          title: assigned.key,
+          state: 'merged',
+          url: 'https://github.com/acme/orca/pull/1',
+          repoId: 'repo',
+          author: 'bob',
+          labels: [],
+          updatedAt: ''
+        }
+      ],
+      result.plane
+    )
+    expect(personalMonitorLane(finished, identity, 'finish')).toBe(true)
+  })
+
+  it('keeps workspace identities separate and leaves failed identity reads unknown', async () => {
+    listProjects.mockResolvedValue(projects.slice(0, 2))
+    testConnection
+      .mockResolvedValueOnce({ ok: true, viewer: { id: 'user-one' } })
+      .mockResolvedValueOnce({ ok: false, error: 'Unavailable' })
+    const result = await loadMonitorSnapshot(
+      [],
+      null,
+      {
+        connected: true,
+        viewer: { id: 'workspace-hash', displayName: 'Workspace', email: null },
+        selectedWorkspaceId: 'all'
+      },
+      'all'
+    )
+    expect(result.planeViewerIds).toEqual({ 'workspace-0': 'user-one' })
+    expect(result.errors).toContain('Plane identity: Unavailable')
+  })
   it('uses existing host-scoped GitHub reads and a bounded recent-merge query', async () => {
     await loadMonitorSnapshot([repo], null, { connected: false, viewer: null }, 'all')
     expect(fetchAcross).toHaveBeenCalledTimes(2)

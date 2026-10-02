@@ -45,7 +45,8 @@ function snapshot(title: string): MonitorSnapshot {
     projects: [],
     errors: [],
     limited: false,
-    fetchedAt: '2026-10-01T00:00:00Z'
+    fetchedAt: '2026-10-01T00:00:00Z',
+    planeViewerIds: {}
   }
 }
 
@@ -113,24 +114,5 @@ describe('work monitor request ownership', () => {
     rerender({ repos: second })
     expect(result.current.data).toBeNull()
     expect(result.current.loading).toBe(true)
-  })
-
-  it('does not apply the local viewer identity to an SSH source', async () => {
-    loadSnapshot.mockResolvedValue(snapshot('first'))
-    const { result } = renderHook(() => useWorkMonitorData(first, disconnected, 'all', false))
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(window.api.gh.viewer).not.toHaveBeenCalled()
-    expect(result.current.githubLogin).toBe('')
-  })
-
-  it('keeps the chosen login when the Plane project changes', async () => {
-    loadSnapshot.mockResolvedValue(snapshot('first'))
-    const { result, rerender } = renderHook(
-      ({ projectId }) => useWorkMonitorData(first, disconnected, projectId, false),
-      { initialProps: { projectId: 'all' } }
-    )
-    act(() => result.current.changeLogin('alice'))
-    rerender({ projectId: 'project-two' })
-    expect(result.current.githubLogin).toBe('alice')
   })
 })

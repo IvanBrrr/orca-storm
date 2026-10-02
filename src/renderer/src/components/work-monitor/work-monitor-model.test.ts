@@ -3,7 +3,10 @@ import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import type { PlaneWorkItem } from '../../../../shared/plane-types'
 import { buildMonitorRows, monitorPeople, personalMonitorLane } from './work-monitor-model'
 
-const identity = { githubLogin: 'alice', planeId: 'plane-alice' }
+const identity = {
+  githubAccounts: { 'repo-1': { host: 'github.com', login: 'alice' } },
+  planeViewerIds: { 'workspace-1': 'plane-alice' }
+}
 function pr(patch: Partial<GitHubWorkItem> = {}): GitHubWorkItem {
   return {
     id: 'pr-1',
@@ -24,6 +27,7 @@ function task(patch: Partial<PlaneWorkItem> = {}): PlaneWorkItem {
     id: 'plane-task',
     key: 'DEV-42',
     sequenceId: 42,
+    workspaceId: 'workspace-1',
     title: 'Reconnect',
     url: 'https://plane.example/acme/DEV-42',
     project: { id: 'project-1', identifier: 'DEV', name: 'Development' },
@@ -38,19 +42,88 @@ function task(patch: Partial<PlaneWorkItem> = {}): PlaneWorkItem {
 }
 
 describe('work monitor', () => {
+  it('does not inherit a public login on an Enterprise host', () => {
+    const enterprise = pr({
+      repoId: 'enterprise',
+      author: 'alice',
+      url: 'https://github.example/acme/orca/pull/12',
+      prRepo: { host: 'github.example', owner: 'acme', repo: 'orca' },
+      reviewDecision: 'CHANGES_REQUESTED'
+    })
+    const [row] = buildMonitorRows([enterprise], [])
+    expect(personalMonitorLane(row, identity, 'author')).toBe(false)
+    const enterpriseIdentity = {
+      ...identity,
+      githubAccounts: {
+        ...identity.githubAccounts,
+        enterprise: { host: 'github.example', login: 'bob' }
+      }
+    }
+    expect(personalMonitorLane(row, enterpriseIdentity, 'author')).toBe(false)
+    const [ownRow] = buildMonitorRows(
+      [
+        {
+          ...enterprise,
+          author: 'bob',
+          reviewRequests: [{ login: 'bob', name: null, avatarUrl: '' }]
+        }
+      ],
+      []
+    )
+    expect(personalMonitorLane(ownRow, enterpriseIdentity, 'author')).toBe(true)
+    expect(personalMonitorLane(ownRow, enterpriseIdentity, 'reviewer')).toBe(true)
+  })
+
+  it('checks the source account of each PR even when different execution hosts share a task', () => {
+    const rows = buildMonitorRows(
+      [
+        pr({ reviewDecision: 'CHANGES_REQUESTED' }),
+        pr({
+          repoId: 'ssh',
+          number: 13,
+          url: 'https://github.com/acme/orca/pull/13',
+          author: 'alice',
+          reviewDecision: 'CHANGES_REQUESTED'
+        })
+      ],
+      [task()]
+    )
+    const reviewerIdentity = {
+      ...identity,
+      githubAccounts: {
+        'repo-1': { host: 'github.com', login: 'alice' },
+        ssh: { host: 'github.com', login: 'bob' }
+      }
+    }
+    expect(personalMonitorLane(rows[0], reviewerIdentity, 'author')).toBe(true)
+    const [remoteOnly] = buildMonitorRows([rows[0].prs[1]], [])
+    expect(personalMonitorLane(remoteOnly, reviewerIdentity, 'author')).toBe(false)
+  })
+
+  it('does not match identical Plane user IDs from different workspaces', () => {
+    const [row] = buildMonitorRows([], [task({ workspaceId: 'other-workspace' })])
+    expect(personalMonitorLane(row, identity, 'working')).toBe(false)
+    expect(
+      personalMonitorLane(
+        row,
+        { ...identity, planeViewerIds: { 'other-workspace': 'plane-alice' } },
+        'working'
+      )
+    ).toBe(true)
+  })
   it('does not link a PR with two different keys when only one task is loaded', () => {
     const pullRequest = pr({ title: 'DEV-42 Reconnect', branchName: 'fix/DEV-43-retry' })
-    const rows = buildMonitorRows([pullRequest], [task()], identity)
+    const rows = buildMonitorRows([pullRequest], [task()])
     expect(rows).toHaveLength(2)
     expect(rows.find((row) => row.prs.length)?.plane).toBeNull()
-    const merged = buildMonitorRows([{ ...pullRequest, state: 'merged' }], [task()], identity)
+    const merged = buildMonitorRows([{ ...pullRequest, state: 'merged' }], [task()])
     expect(merged.some((row) => row.actions.some((action) => action.reason === 'close'))).toBe(
       false
     )
   })
 
   it('allows the same key in both the title and branch', () => {
-    const [row] = buildMonitorRows([pr({ branchName: 'fix/dev-42' })], [task()], identity)
+    const [row] = buildMonitorRows([pr({ branchName: 'fix/dev-42' })], [task()])
     expect(row.plane?.key).toBe('DEV-42')
   })
   it('keeps author actions and a requested review on the same task', () => {
@@ -69,15 +142,18 @@ describe('work monitor', () => {
           }
         })
       ],
-      [task()],
-      identity
+      [task()]
     )
     expect(rows).toHaveLength(1)
     expect(rows[0].actions.map((a) => a.reason)).toEqual(['changes', 'checks', 'review'])
     expect(personalMonitorLane(rows[0], identity, 'author')).toBe(true)
-    expect(personalMonitorLane(rows[0], { githubLogin: 'bob', planeId: null }, 'reviewer')).toBe(
-      true
-    )
+    expect(
+      personalMonitorLane(
+        rows[0],
+        { githubAccounts: { 'repo-1': { host: 'github.com', login: 'bob' } }, planeViewerIds: {} },
+        'reviewer'
+      )
+    ).toBe(true)
     expect(personalMonitorLane(rows[0], identity, 'waiting')).toBe(false)
   })
 
@@ -91,8 +167,7 @@ describe('work monitor', () => {
           reviewRequests: [{ login: 'bob', name: null, avatarUrl: '' }]
         })
       ],
-      [task()],
-      identity
+      [task()]
     )
     expect(rows).toHaveLength(1)
     expect(rows[0].prs).toHaveLength(2)
@@ -101,9 +176,13 @@ describe('work monitor', () => {
   })
 
   it('assigns the completion check to the Plane assignee after all PRs merged', () => {
-    const [row] = buildMonitorRows([pr({ state: 'merged', author: 'bob' })], [task()], identity)
+    const [row] = buildMonitorRows([pr({ state: 'merged', author: 'bob' })], [task()])
     expect(row.actions).toEqual([
-      { lane: 'finish', reason: 'close', person: { id: 'github:alice', name: 'alice' } }
+      {
+        lane: 'finish',
+        reason: 'close',
+        person: { id: 'plane:workspace-1:plane-alice', name: 'Alice' }
+      }
     ])
     expect(personalMonitorLane(row, identity, 'finish')).toBe(true)
   })
@@ -112,13 +191,10 @@ describe('work monitor', () => {
     expect(
       buildMonitorRows(
         [pr({ state: 'merged' })],
-        [task({ state: { id: 'done', name: 'Done', group: 'completed' } })],
-        identity
+        [task({ state: { id: 'done', name: 'Done', group: 'completed' } })]
       )
     ).toEqual([])
-    expect(buildMonitorRows([pr({ state: 'merged', title: 'Unrelated' })], [], identity)).toEqual(
-      []
-    )
+    expect(buildMonitorRows([pr({ state: 'merged', title: 'Unrelated' })], [])).toEqual([])
   })
 
   it('does not conflate matching keys in different Plane workspaces', () => {
@@ -127,8 +203,7 @@ describe('work monitor', () => {
       [
         task(),
         task({ id: 'other', url: 'https://plane.example/other/DEV-42', workspaceId: 'other' })
-      ],
-      identity
+      ]
     )
     expect(rows).toHaveLength(3)
     expect(rows.find((r) => r.prs.length)?.plane).toBeNull()
@@ -137,17 +212,14 @@ describe('work monitor', () => {
   it('matches complete keys in a branch without matching key prefixes', () => {
     const [row] = buildMonitorRows(
       [pr({ title: 'Reconnect', branchName: 'fix/dev-42-reconnect' })],
-      [task()],
-      identity
+      [task()]
     )
     expect(row.plane?.key).toBe('DEV-42')
-    expect(buildMonitorRows([pr({ title: 'DEV-420 Reconnect' })], [task()], identity)).toHaveLength(
-      2
-    )
+    expect(buildMonitorRows([pr({ title: 'DEV-420 Reconnect' })], [task()])).toHaveLength(2)
   })
 
   it('deduplicates a PR returned through multiple repositories', () => {
-    expect(buildMonitorRows([pr(), pr({ repoId: 'repo-2' })], [], identity)).toHaveLength(1)
+    expect(buildMonitorRows([pr(), pr({ repoId: 'repo-2' })], [])).toHaveLength(1)
   })
 
   it('keeps the same login on GitHub and an Enterprise host separate in the team overview', () => {
@@ -160,8 +232,7 @@ describe('work monitor', () => {
           prRepo: { owner: 'acme', repo: 'orca', host: 'github.example' }
         })
       ],
-      [],
-      identity
+      []
     )
     expect(
       monitorPeople(rows)
@@ -190,8 +261,7 @@ describe('work monitor', () => {
           ...patch
         })
       ],
-      [],
-      identity
+      []
     )
     expect(row.actions.some((a) => a.reason === 'merge')).toBe(false)
   })
@@ -213,46 +283,40 @@ describe('work monitor', () => {
           }
         })
       ],
-      [],
-      identity
+      []
     )
     expect(personalMonitorLane(row, identity, 'finish')).toBe(true)
   })
 
   it('keeps unknown review metadata distinct from a requested review', () => {
-    const [row] = buildMonitorRows([pr()], [], identity)
+    const [row] = buildMonitorRows([pr()], [])
     expect(row.actions[0].reason).toBe('unknown')
     expect(personalMonitorLane(row, identity, 'unknown')).toBe(true)
     expect(personalMonitorLane(row, identity, 'waiting')).toBe(false)
     expect(personalMonitorLane(row, identity, 'reviewer')).toBe(false)
   })
 
-  it('keeps names from different providers separate and combines only the known viewer', () => {
+  it('keeps provider and workspace identities separate, including the current viewer', () => {
     const rows = buildMonitorRows(
       [pr({ author: 'bob' })],
       [
         task({ assignees: [{ id: 'plane-bob', displayName: 'bob' }] }),
         task({ id: 'second', key: 'DEV-43', url: 'https://plane.example/acme/DEV-43' })
-      ],
-      identity
+      ]
     )
     expect(
       monitorPeople(rows)
         .map((p) => p.id)
         .sort()
-    ).toEqual(['github:alice', 'github:bob', 'plane:plane-bob'])
+    ).toEqual(['github:bob', 'plane:workspace-1:plane-alice', 'plane:workspace-1:plane-bob'])
   })
 
   it('includes started Plane tasks for folder-only work without inventing a PR', () => {
-    const [row] = buildMonitorRows([], [task()], identity)
+    const [row] = buildMonitorRows([], [task()])
     expect(row.prs).toEqual([])
     expect(personalMonitorLane(row, identity, 'working')).toBe(true)
     expect(
-      buildMonitorRows(
-        [],
-        [task({ state: { id: 'backlog', name: 'Backlog', group: 'backlog' } })],
-        identity
-      )
+      buildMonitorRows([], [task({ state: { id: 'backlog', name: 'Backlog', group: 'backlog' } })])
     ).toEqual([])
   })
 })

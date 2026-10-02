@@ -10,6 +10,7 @@ import { getTaskPageRepoSourceContext } from '../task-page-source-context'
 import {
   planeListProjects,
   planeListWorkItems,
+  planeTestConnection,
   type RuntimePlaneSettings
 } from '@/runtime/runtime-plane-client'
 import { useAppStore } from '@/store'
@@ -23,6 +24,7 @@ export type MonitorSnapshot = {
   errors: string[]
   limited: boolean
   fetchedAt: string
+  planeViewerIds: Record<string, string>
 }
 
 export async function loadMonitorSnapshot(
@@ -38,7 +40,8 @@ export async function loadMonitorSnapshot(
     projects: [],
     errors: [],
     limited: false,
-    fetchedAt: ''
+    fetchedAt: '',
+    planeViewerIds: {}
   }
   const repoArgs = repos.map((repo) => ({
     repoId: repo.id,
@@ -76,6 +79,39 @@ export async function loadMonitorSnapshot(
               projectId === 'all'
                 ? snapshot.projects
                 : snapshot.projects.filter((p) => p.id === projectId)
+            const viewerWorkspaces = new Set(
+              projects
+                .map(
+                  (project) =>
+                    project.workspaceId ?? (workspaceId === 'all' ? undefined : workspaceId)
+                )
+                .filter((id) => id !== undefined)
+            )
+            if (!viewerWorkspaces.size && workspaceId !== 'all') {
+              viewerWorkspaces.add(workspaceId ?? '')
+            }
+            const viewers = await mapSettledWithConcurrency(
+              [...viewerWorkspaces],
+              3,
+              async (id) => {
+                if (signal?.aborted) {
+                  return
+                }
+                const result = await planeTestConnection(
+                  settings,
+                  id ? { workspaceId: id } : undefined
+                )
+                if (!result.ok || !result.viewer.id) {
+                  throw new Error(result.ok ? 'Plane user identity unavailable' : result.error)
+                }
+                snapshot.planeViewerIds[id] = result.viewer.id
+              }
+            )
+            viewers.forEach((result) => {
+              if (result.status === 'rejected') {
+                snapshot.errors.push(`Plane identity: ${errorMessage(result.reason)}`)
+              }
+            })
             const responses = await mapSettledWithConcurrency(projects, 3, async (project) => {
               if (signal?.aborted) {
                 return

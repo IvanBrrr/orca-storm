@@ -31,7 +31,10 @@ export type MonitorRow = {
   updatedAt: string
   participants: MonitorPerson[]
 }
-export type MonitorIdentity = { githubLogin: string; planeId: string | null }
+export type MonitorIdentity = {
+  githubAccounts: Readonly<Record<string, { host: string; login: string }>>
+  planeViewerIds: Readonly<Record<string, string>>
+}
 
 export function githubPerson(login: string, host = 'github.com'): MonitorPerson {
   const scope = host.toLowerCase() === 'github.com' ? '' : `${host.toLowerCase()}:`
@@ -42,10 +45,9 @@ export function monitorPRPerson(pr: GitHubWorkItem): MonitorPerson | null {
   return pr.author ? githubPerson(pr.author, pr.prRepo?.host) : null
 }
 
-function planePerson(id: string, name: string, identity: MonitorIdentity): MonitorPerson {
-  return id === identity.planeId && identity.githubLogin
-    ? githubPerson(identity.githubLogin)
-    : { id: `plane:${id}`, name }
+function planePerson(item: PlaneWorkItem, id: string, name: string): MonitorPerson {
+  const workspaceId = item.workspaceId ?? item.project.workspaceId ?? ''
+  return { id: `plane:${workspaceId}:${id}`, name }
 }
 
 function prActions(pr: GitHubWorkItem): MonitorAction[] {
@@ -110,8 +112,7 @@ function keyReferences(pr: GitHubWorkItem): Set<string> {
 
 export function buildMonitorRows(
   github: readonly GitHubWorkItem[],
-  plane: readonly PlaneWorkItem[],
-  identity: MonitorIdentity
+  plane: readonly PlaneWorkItem[]
 ): MonitorRow[] {
   const rows = new Map<string, MonitorRow>()
   const byKey = new Map<string, PlaneWorkItem[]>()
@@ -158,7 +159,7 @@ export function buildMonitorRows(
     const id = `plane:${item.url}`
     const row = rows.get(id)
     const assignees = item.assignees.map((member) =>
-      planePerson(member.id, member.displayName, identity)
+      planePerson(item, member.id, member.displayName)
     )
     if (row) {
       row.participants.push(...assignees)
@@ -199,25 +200,36 @@ export function personalMonitorLane(
   identity: MonitorIdentity,
   lane: MonitorLane
 ): boolean {
-  const mine = new Set([
-    ...(identity.githubLogin
-      ? [
-          githubPerson(identity.githubLogin).id,
-          ...row.prs.map((pr) => githubPerson(identity.githubLogin, pr.prRepo?.host).id)
-        ]
-      : []),
-    ...(identity.planeId ? [`plane:${identity.planeId}`] : [])
-  ])
-  if (lane === 'waiting') {
-    return (
-      row.participants.some((p) => mine.has(p.id)) &&
-      row.actions.some((a) => a.lane === 'waiting' || (a.person && !mine.has(a.person.id))) &&
-      !row.actions.some(
-        (a) => a.person && mine.has(a.person.id) && a.lane !== 'waiting' && a.lane !== 'unknown'
-      )
+  const planeWorkspace = row.plane?.workspaceId ?? row.plane?.project.workspaceId ?? ''
+  const planeViewer = identity.planeViewerIds[planeWorkspace]
+  const minePlane = planeViewer ? `plane:${planeWorkspace}:${planeViewer}` : null
+  const minePR = (pr: GitHubWorkItem, person: MonitorPerson | null): boolean => {
+    const account = identity.githubAccounts[pr.repoId]
+    return Boolean(
+      account?.login &&
+      account.host.toLowerCase() === (pr.prRepo?.host ?? 'github.com').toLowerCase() &&
+      person?.id === githubPerson(account.login, account.host).id
     )
   }
-  return row.actions.some((a) => a.lane === lane && a.person && mine.has(a.person.id))
+  const mineAction = (action: MonitorAction): boolean => {
+    if (!action.person) {
+      return false
+    }
+    if (action.person.id === minePlane) {
+      return true
+    }
+    const pr = row.prs.find((item) => item.url === action.prUrl)
+    return Boolean(pr && minePR(pr, action.person))
+  }
+  if (lane === 'waiting') {
+    return (
+      (row.participants.some((p) => p.id === minePlane) ||
+        row.prs.some((pr) => minePR(pr, monitorPRPerson(pr)))) &&
+      row.actions.some((a) => a.lane === 'waiting' || (a.person && !mineAction(a))) &&
+      !row.actions.some((a) => mineAction(a) && a.lane !== 'waiting' && a.lane !== 'unknown')
+    )
+  }
+  return row.actions.some((a) => a.lane === lane && mineAction(a))
 }
 
 export function monitorPeople(rows: readonly MonitorRow[]): MonitorPerson[] {
