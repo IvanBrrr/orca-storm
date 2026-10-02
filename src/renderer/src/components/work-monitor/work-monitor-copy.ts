@@ -38,8 +38,8 @@ export function monitorReasonLabel(reason: MonitorReason): string {
       return translate('workMonitor.taskWorking', 'Plane: in progress · no linked PR loaded')
     case 'assigned':
       return translate('workMonitor.assigned', 'Assigned task')
-    case 'noReviewer':
-      return translate('workMonitor.noReviewer', 'No pending review request · next turn unclear')
+    case 'reviewRoutingUnknown':
+      return translate('workMonitor.reviewRoutingUnknown', 'Next reviewer not confirmed')
     case 'mergeBlocked':
       return translate('workMonitor.mergeBlocked', 'Approved · merge readiness not confirmed')
     case 'unknown':

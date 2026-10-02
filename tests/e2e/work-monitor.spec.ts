@@ -167,7 +167,15 @@ test('work monitor renders personal turns, linked details and team queues', asyn
     path: testInfo.outputPath('work-monitor-detail.png'),
     animations: 'disabled'
   })
-  await detail.getByRole('button', { name: 'Close', exact: true }).click({ force: true })
+  await orcaPage.keyboard.press('Escape')
+  await expect(detail).toHaveCount(0)
+  await expect(orcaPage.getByRole('tab', { name: 'My attention', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+  await authorLane.getByRole('button', { name: /Reconnect reliably/ }).click({ force: true })
+  await expect(detail).toBeVisible()
+  await detail.getByRole('button', { name: 'Close', exact: true }).dispatchEvent('click')
 
   await orcaPage.getByRole('tab', { name: 'Team', exact: true }).click({ force: true })
   const table = orcaPage.getByRole('table')
@@ -182,4 +190,14 @@ test('work monitor renders personal turns, linked details and team queues', asyn
     path: testInfo.outputPath('work-monitor-team.png'),
     animations: 'disabled'
   })
+  await orcaPage.keyboard.press('Escape')
+  await expect(orcaPage.getByRole('tablist', { name: 'Work views' })).toHaveCount(0)
+  await orcaPage.evaluate(() => window.__store?.getState().openTaskPage())
+  const login = orcaPage.locator('#work-monitor-login')
+  await login.focus()
+  await orcaPage.keyboard.press('Escape')
+  await expect(login).not.toBeFocused()
+  await expect(orcaPage.getByRole('tablist', { name: 'Work views' })).toBeVisible()
+  await orcaPage.keyboard.press('Escape')
+  await expect(orcaPage.getByRole('tablist', { name: 'Work views' })).toHaveCount(0)
 })

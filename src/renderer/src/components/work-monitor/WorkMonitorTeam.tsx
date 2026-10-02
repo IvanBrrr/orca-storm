@@ -14,7 +14,14 @@ export function WorkMonitorTeam({
   const [selected, setSelected] = useState<string | null>(null)
   const people = monitorPeople(rows)
   const selectedPerson = people.find((p) => p.id === selected)
-  const noReviewer = rows.filter((r) => r.actions.some((a) => a.reason === 'noReviewer'))
+  const reviewRoutingUnknown = new Set(
+    rows.flatMap((row) =>
+      row.actions
+        .filter((action) => action.lane === 'unknown')
+        .map((action) => action.prUrl)
+        .filter(Boolean)
+    )
+  ).size
   const needsChanges = rows.filter((r) => r.actions.some((a) => a.lane === 'author'))
   const unclear = rows.filter((r) => r.actions.some((a) => a.lane === 'unknown' || !a.person))
   return (
@@ -54,6 +61,16 @@ export function WorkMonitorTeam({
                 rows.filter((r) =>
                   r.actions.some((a) => a.person?.id === person.id && a.lane === lane)
                 ).length
+              const reviewCount = new Set(
+                rows.flatMap((row) =>
+                  row.actions
+                    .filter(
+                      (action) => action.person?.id === person.id && action.lane === 'reviewer'
+                    )
+                    .map((action) => action.prUrl)
+                    .filter(Boolean)
+                )
+              ).size
               return (
                 <tr key={person.id} className="border-b border-border hover:bg-accent">
                   <td className="px-3 py-2">
@@ -71,7 +88,7 @@ export function WorkMonitorTeam({
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{countLane('working')}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{prs.length}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{countLane('reviewer')}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{reviewCount}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{countLane('author')}</td>
                 </tr>
               )
@@ -81,9 +98,9 @@ export function WorkMonitorTeam({
       </div>
       <p className="text-xs text-muted-foreground">
         {translate(
-          'workMonitor.bottlenecks',
-          '{{reviews}} PRs without a pending review request · {{changes}} tasks need author actions',
-          { reviews: noReviewer.length, changes: needsChanges.length }
+          'workMonitor.reviewBottlenecks',
+          '{{reviews}} PRs with unconfirmed review routing · {{changes}} tasks need author actions',
+          { reviews: reviewRoutingUnknown, changes: needsChanges.length }
         )}
       </p>
       {unclear.length ? (

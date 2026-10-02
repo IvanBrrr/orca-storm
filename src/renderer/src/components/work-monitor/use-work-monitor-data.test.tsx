@@ -70,6 +70,37 @@ afterEach(() => {
 })
 
 describe('work monitor request ownership', () => {
+  it('does not apply a late Plane identity from the previous workspace', async () => {
+    let oldResponse: (value: MonitorSnapshot) => void = () => {}
+    loadSnapshot
+      .mockImplementationOnce(
+        () =>
+          new Promise<MonitorSnapshot>((resolve) => {
+            oldResponse = resolve
+          })
+      )
+      .mockResolvedValueOnce({
+        ...snapshot('current'),
+        planeViewerIds: { 'workspace-two': 'user-two' }
+      })
+    const status: PlaneConnectionStatus = {
+      connected: true,
+      viewer: { id: 'workspace-one', displayName: 'Workspace', email: null },
+      selectedWorkspaceId: 'workspace-one'
+    }
+    const { result, rerender } = renderHook(
+      ({ status }) => useWorkMonitorData(first, status, 'all', false),
+      { initialProps: { status } }
+    )
+    rerender({ status: { ...status, selectedWorkspaceId: 'workspace-two' } })
+    await waitFor(() =>
+      expect(result.current.data?.planeViewerIds).toEqual({ 'workspace-two': 'user-two' })
+    )
+    await act(async () => {
+      oldResponse({ ...snapshot('old'), planeViewerIds: { 'workspace-one': 'user-one' } })
+    })
+    expect(result.current.data?.planeViewerIds).toEqual({ 'workspace-two': 'user-two' })
+  })
   it('rejects a late response from a previously selected SSH host', async () => {
     let resolveFirst: (value: MonitorSnapshot) => void = () => {}
     let resolveSecond: (value: MonitorSnapshot) => void = () => {}

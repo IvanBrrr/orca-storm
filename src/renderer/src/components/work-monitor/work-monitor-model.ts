@@ -12,7 +12,7 @@ export type MonitorReason =
   | 'close'
   | 'working'
   | 'assigned'
-  | 'noReviewer'
+  | 'reviewRoutingUnknown'
   | 'mergeBlocked'
   | 'unknown'
 export type MonitorPerson = { id: string; name: string; host?: string }
@@ -94,7 +94,7 @@ function prActions(pr: GitHubWorkItem): MonitorAction[] {
   } else if (!actions.length) {
     actions.push({
       lane: 'unknown',
-      reason: pr.reviewRequests ? 'noReviewer' : 'unknown',
+      reason: pr.reviewRequests ? 'reviewRoutingUnknown' : 'unknown',
       person: author
     })
   }

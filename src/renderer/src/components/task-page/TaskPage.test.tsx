@@ -64,7 +64,7 @@ describe('work screen navigation', () => {
     expect(document.activeElement).not.toBe(input)
     expect(state.closeTaskPage).not.toHaveBeenCalled()
     state.activeModal = 'new-workspace-composer'
-    rerender(<TaskPage />, { wrapper: TooltipProvider })
+    rerender(<TaskPage />)
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(state.closeTaskPage).not.toHaveBeenCalled()
     input.remove()
@@ -93,7 +93,7 @@ describe('work screen navigation', () => {
   it('opens an externally requested task while the monitor is visible', () => {
     const { rerender } = render(<TaskPage />, { wrapper: TooltipProvider })
     state.taskPageData = { taskSource: 'github', preselectedRepoId: 'repo-1' }
-    rerender(<TaskPage />, { wrapper: TooltipProvider })
+    rerender(<TaskPage />)
     expect(screen.getByText('Existing task list')).toBeInTheDocument()
   })
 })
