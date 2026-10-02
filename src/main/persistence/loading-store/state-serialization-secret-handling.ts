@@ -3,8 +3,7 @@ import {
   serializeSelectiveProfileStateDomains
 } from './profile-state-authority-writes'
 import type { ProfileStateDomainReplacement } from './profile-state-authority'
-import { randomUUID } from 'node:crypto'
-import { createHash } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import { collectFolderWorkspaceDiffComments } from '../../folder-workspace-diff-comments'
 import {
