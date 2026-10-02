@@ -38,6 +38,21 @@ function task(patch: Partial<PlaneWorkItem> = {}): PlaneWorkItem {
 }
 
 describe('work monitor', () => {
+  it('does not link a PR with two different keys when only one task is loaded', () => {
+    const pullRequest = pr({ title: 'DEV-42 Reconnect', branchName: 'fix/DEV-43-retry' })
+    const rows = buildMonitorRows([pullRequest], [task()], identity)
+    expect(rows).toHaveLength(2)
+    expect(rows.find((row) => row.prs.length)?.plane).toBeNull()
+    const merged = buildMonitorRows([{ ...pullRequest, state: 'merged' }], [task()], identity)
+    expect(merged.some((row) => row.actions.some((action) => action.reason === 'close'))).toBe(
+      false
+    )
+  })
+
+  it('allows the same key in both the title and branch', () => {
+    const [row] = buildMonitorRows([pr({ branchName: 'fix/dev-42' })], [task()], identity)
+    expect(row.plane?.key).toBe('DEV-42')
+  })
   it('keeps author actions and a requested review on the same task', () => {
     const rows = buildMonitorRows(
       [

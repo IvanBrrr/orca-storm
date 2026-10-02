@@ -121,7 +121,8 @@ export function buildMonitorRows(
   }
   const uniquePRs = new Map(github.filter((item) => item.type === 'pr').map((pr) => [pr.url, pr]))
   for (const pr of uniquePRs.values()) {
-    const references = [...keyReferences(pr)].flatMap((key) => byKey.get(key) ?? [])
+    const keys = [...keyReferences(pr)]
+    const references = keys.length === 1 ? (byKey.get(keys[0]) ?? []) : []
     // Ambiguous references must not combine tasks from different projects or workspaces.
     const task = references.length === 1 ? references[0] : null
     if (
