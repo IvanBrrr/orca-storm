@@ -71,7 +71,11 @@ test('work monitor renders personal turns, linked details and team queues', asyn
         'plane:status',
         'plane:testConnection',
         'plane:listProjects',
-        'plane:listWorkItems'
+        'plane:listWorkItems',
+        'plane:getWorkItem',
+        'plane:listStates',
+        'plane:listMembers',
+        'plane:listLabels'
       ]) {
         ipcMain.removeHandler(channel)
       }
@@ -94,7 +98,22 @@ test('work monitor renders personal turns, linked details and team queues', asyn
         project,
         { ...project, id: 'private-project', name: 'Private project' }
       ])
+      process.env.ORCA_E2E_PLANE_READS = '0'
+      ipcMain.handle('plane:listStates', () => [
+        tasks[0].state,
+        { id: 'backlog', name: 'Backlog', group: 'backlog' }
+      ])
+      ipcMain.handle('plane:listMembers', () => tasks[0].assignees)
+      ipcMain.handle('plane:listLabels', () => [
+        { id: 'bug', name: 'Bug' },
+        { id: 'feature', name: 'Feature' }
+      ])
+      ipcMain.handle(
+        'plane:getWorkItem',
+        (_event, args: { key: string }) => tasks.find((item) => item.key === args.key) ?? null
+      )
       ipcMain.handle('plane:listWorkItems', (_event, args: { project: { id: string } }) => {
+        process.env.ORCA_E2E_PLANE_READS = String(Number(process.env.ORCA_E2E_PLANE_READS) + 1)
         if (args.project.id === 'private-project') {
           throw new Error("You don't have permission to view this workitem")
         }
@@ -198,6 +217,62 @@ test('work monitor renders personal turns, linked details and team queues', asyn
     path: testInfo.outputPath('work-monitor-team.png'),
     animations: 'disabled'
   })
+  await orcaPage.evaluate(() => window.__store?.getState().openTaskPage({ taskSource: 'plane' }))
+  const search = orcaPage.getByRole('searchbox', { name: 'Search work items' })
+  await expect(search).toBeVisible()
+  await expect(
+    orcaPage
+      .getByRole('tabpanel', { name: 'Task list', exact: true })
+      .getByText('DEV-42', { exact: true })
+  ).toBeVisible()
+  await search.fill('42')
+  await expect(
+    orcaPage
+      .getByRole('tabpanel', { name: 'Task list', exact: true })
+      .getByText('DEV-42', { exact: true })
+  ).toBeVisible()
+  await expect(
+    orcaPage
+      .getByRole('tabpanel', { name: 'Task list', exact: true })
+      .getByText('DEV-43', { exact: true })
+  ).toHaveCount(0)
+  await search.fill('DEV-42')
+  await expect(
+    orcaPage
+      .getByRole('tabpanel', { name: 'Task list', exact: true })
+      .getByText('DEV-42', { exact: true })
+  ).toBeVisible()
+  await orcaPage.getByRole('combobox', { name: 'Status', exact: true }).click({ force: true })
+  await orcaPage.getByRole('option', { name: 'In progress', exact: true }).click({ force: true })
+  await orcaPage.getByRole('option', { name: 'Backlog', exact: true }).click({ force: true })
+  await orcaPage.keyboard.press('Escape')
+  await expect(orcaPage.getByRole('combobox', { name: 'Status', exact: true })).toContainText(
+    'Status (2)'
+  )
+  const reads = await electronApp.evaluate(() => process.env.ORCA_E2E_PLANE_READS)
+  await orcaPage.getByRole('tab', { name: 'My attention', exact: true }).click({ force: true })
+  await expect(authorLane.getByRole('button', { name: /Reconnect reliably/ })).toBeVisible()
+  await orcaPage.getByRole('tab', { name: 'Task list', exact: true }).click({ force: true })
+  await expect(search).toHaveValue('DEV-42')
+  await orcaPage.evaluate(() => window.__store?.getState().setActiveView('terminal'))
+  await expect(orcaPage.getByRole('tablist', { name: 'Work views' })).toHaveCount(0)
+  await orcaPage.evaluate(() => window.__store?.getState().openTaskPage())
+  await expect(orcaPage.getByRole('tab', { name: 'Task list', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+  await expect(search).toHaveValue('DEV-42')
+  await expect(
+    orcaPage
+      .getByRole('tabpanel', { name: 'Task list', exact: true })
+      .getByText('DEV-42', { exact: true })
+  ).toBeVisible()
+  expect(await electronApp.evaluate(() => process.env.ORCA_E2E_PLANE_READS)).toBe(reads)
+  await orcaPage.screenshot({
+    path: testInfo.outputPath('plane-multi-filters.png'),
+    animations: 'disabled'
+  })
+  await orcaPage.getByRole('tab', { name: 'My attention', exact: true }).click({ force: true })
   await orcaPage.keyboard.press('Escape')
   await expect(orcaPage.getByRole('tablist', { name: 'Work views' })).toHaveCount(0)
   await orcaPage.evaluate(() => window.__store?.getState().openTaskPage())

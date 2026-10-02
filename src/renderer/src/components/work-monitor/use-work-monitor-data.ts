@@ -27,7 +27,11 @@ export function useWorkMonitorData(
     let cancelled = false
     const controller = new AbortController()
     setLoadingContext(context)
-    void loadMonitorSnapshot(repos, settings, status, projectId, controller.signal)
+    void loadMonitorSnapshot(repos, settings, status, projectId, controller.signal, (data) => {
+      if (!cancelled) {
+        setResult({ context, data })
+      }
+    })
       .then((data) => {
         if (!cancelled) {
           setResult({ context, data })
@@ -59,7 +63,7 @@ export function useWorkMonitorData(
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && useAppStore.getState().activeView === 'tasks') {
         refresh()
       }
     }, 300_000)

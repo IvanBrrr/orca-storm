@@ -1,9 +1,13 @@
 import { useEffect } from 'react'
 import { hasVisibleOverlay } from '@/lib/visible-overlay'
 
-export function useTaskPageEscape(activeModal: string, closeTaskPage: () => void): void {
+export function useTaskPageEscape(
+  activeModal: string,
+  closeTaskPage: () => void,
+  enabled = true
+): void {
   useEffect(() => {
-    if (activeModal !== 'none') {
+    if (!enabled || activeModal !== 'none') {
       return
     }
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -32,5 +36,5 @@ export function useTaskPageEscape(activeModal: string, closeTaskPage: () => void
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [activeModal, closeTaskPage])
+  }, [activeModal, closeTaskPage, enabled])
 }

@@ -8,9 +8,9 @@ import {
 
 const defaultView: PlaneWorkItemView = {
   search: '',
-  stateId: 'all',
-  assigneeId: 'all',
-  priority: 'all',
+  stateIds: [],
+  assigneeIds: [],
+  priorities: [],
   labelIds: [],
   sortField: 'updated',
   sortDirection: 'desc'
@@ -51,12 +51,31 @@ describe('Plane work item view', () => {
     const view = {
       ...defaultView,
       search: 'fix',
-      stateId: 'review',
-      assigneeId: 'alice',
-      priority: 'urgent'
+      stateIds: ['review'],
+      assigneeIds: ['alice'],
+      priorities: ['urgent']
     }
     expect(selectPlaneWorkItems(items, view).map((entry) => entry.key)).toEqual(['DEV-10'])
-    expect(selectPlaneWorkItems(items, { ...defaultView, assigneeId: 'unassigned' }).length).toBe(2)
+    expect(
+      selectPlaneWorkItems(items, { ...defaultView, assigneeIds: ['unassigned'] }).length
+    ).toBe(2)
+  })
+
+  it('combines choices within each facet with OR and facets with AND', () => {
+    expect(
+      selectPlaneWorkItems(items, {
+        ...defaultView,
+        stateIds: ['review', 'todo'],
+        assigneeIds: ['alice', 'unassigned'],
+        priorities: ['urgent', 'low']
+      }).map((item) => item.key)
+    ).toEqual(['DEV-10', 'DEV-2'])
+  })
+
+  it.each(['10', 'DEV-10', 'dev-10'])('searches the key with %s', (search) => {
+    expect(selectPlaneWorkItems(items, { ...defaultView, search }).map((item) => item.key)).toEqual(
+      ['DEV-10']
+    )
   })
 
   it('sorts numeric keys and priority without mutating the fetched list', () => {

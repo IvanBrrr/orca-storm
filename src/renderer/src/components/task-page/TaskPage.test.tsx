@@ -11,8 +11,9 @@ const state = vi.hoisted(() => {
   const initial: {
     taskPageData: TaskPageData
     activeModal: string
+    activeView: string
     closeTaskPage: ReturnType<typeof vi.fn>
-  } = { taskPageData: {}, activeModal: 'none', closeTaskPage: vi.fn() }
+  } = { taskPageData: {}, activeModal: 'none', activeView: 'tasks', closeTaskPage: vi.fn() }
   return initial
 })
 vi.mock('@/store', () => ({
@@ -27,6 +28,7 @@ vi.mock('./TaskListPage', () => ({ default: () => <div>Existing task list</div> 
 beforeEach(() => {
   state.taskPageData = {}
   state.activeModal = 'none'
+  state.activeView = 'tasks'
   state.closeTaskPage.mockClear()
 })
 afterEach(cleanup)
@@ -69,6 +71,13 @@ describe('work screen navigation', () => {
     expect(state.closeTaskPage).not.toHaveBeenCalled()
     input.remove()
   })
+  it('does not handle Escape while another app page is active', () => {
+    state.activeView = 'terminal'
+    render(<TaskPage />, { wrapper: TooltipProvider })
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(state.closeTaskPage).not.toHaveBeenCalled()
+  })
+
   it('opens attention by default and exposes accessible team and task tabs', async () => {
     const user = userEvent.setup()
     render(<TaskPage />, { wrapper: TooltipProvider })

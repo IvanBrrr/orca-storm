@@ -40,7 +40,7 @@ import { useTaskPageJiraListEffects } from '../use-task-page-jira-list-effects'
 import { useTaskPageComposerActions } from '../use-task-page-composer-actions'
 import { TaskPageSurface } from './Surface'
 
-export default function TaskPage(): React.JSX.Element {
+export default function TaskPage({ active = true }: { active?: boolean }): React.JSX.Element {
   const stage1 = useTaskPageStoreBindings()
   const stage2 = useTaskPageRepoSelection(stage1)
   const stage3 = useTaskPageRuntimeHosts(stage2)
@@ -80,5 +80,5 @@ export default function TaskPage(): React.JSX.Element {
   const stage37 = useTaskPageLinearCollectionEffects(stage36)
   const stage38 = useTaskPageJiraListEffects(stage37)
   const stage39 = useTaskPageComposerActions(stage38)
-  return <TaskPageSurface model={stage39} />
+  return <TaskPageSurface model={stage39} active={active} />
 }

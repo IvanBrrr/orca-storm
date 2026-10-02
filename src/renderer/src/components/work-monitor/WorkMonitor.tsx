@@ -42,7 +42,13 @@ import { WorkMonitorDetail } from './WorkMonitorDetail'
 
 const LANES: MonitorLane[] = ['author', 'reviewer', 'waiting', 'working', 'finish', 'unknown']
 
-export function WorkMonitor({ view }: { view: 'attention' | 'team' }): React.JSX.Element {
+export function WorkMonitor({
+  view,
+  active = true
+}: {
+  view: 'attention' | 'team'
+  active?: boolean
+}): React.JSX.Element {
   useTranslation()
   const repos = useAppStore((s) => s.repos)
   const eligible = useMemo(
@@ -234,9 +240,9 @@ export function WorkMonitor({ view }: { view: 'attention' | 'team' }): React.JSX
           </p>
         ) : null}
       </div>
-      <WorkMonitorDetail row={selectedRow} onClose={() => setSelectedRowId(null)} />
+      <WorkMonitorDetail row={active ? selectedRow : null} onClose={() => setSelectedRowId(null)} />
       <PlaneConnectDialog
-        open={connectOpen}
+        open={active && connectOpen}
         onOpenChange={setConnectOpen}
         onConnected={() => {
           setConnectOpen(false)

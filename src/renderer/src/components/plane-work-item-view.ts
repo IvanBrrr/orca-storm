@@ -1,4 +1,9 @@
-import { isPlanePriority, type PlaneWorkItem } from '../../../shared/plane-types'
+import { matchesPlaneWorkItemFilters } from '../../../shared/plane-work-item-filters'
+import {
+  isPlanePriority,
+  type PlaneWorkItem,
+  type PlaneWorkItemListFilters
+} from '../../../shared/plane-types'
 
 export type PlaneSortField =
   | 'updated'
@@ -12,9 +17,9 @@ export type PlaneSortDirection = 'asc' | 'desc'
 
 export type PlaneWorkItemView = {
   search: string
-  stateId: string
-  assigneeId: string
-  priority: string
+  stateIds: string[]
+  assigneeIds: string[]
+  priorities: string[]
   labelIds: string[]
   sortField: PlaneSortField
   sortDirection: PlaneSortDirection
@@ -38,26 +43,16 @@ export function planeWorkItemOrderBy(view: PlaneWorkItemView): string {
 }
 
 export function planeWorkItemFilters(
-  view: Pick<PlaneWorkItemView, 'search' | 'stateId' | 'assigneeId' | 'priority' | 'labelIds'>
-): {
-  search?: string
-  stateId?: string
-  assigneeId?: string
-  priority?: PlaneWorkItem['priority']
-  unassigned?: boolean
-  labelIds?: string[]
-} {
+  view: Pick<PlaneWorkItemView, 'search' | 'stateIds' | 'assigneeIds' | 'priorities' | 'labelIds'>
+): PlaneWorkItemListFilters {
   const search = view.search.trim()
+  const assigneeIds = view.assigneeIds.filter((id) => id !== 'unassigned')
   return {
     ...(search ? { search } : {}),
-    ...(view.stateId !== 'all' ? { stateId: view.stateId } : {}),
-    ...(view.assigneeId === 'unassigned' ? { unassigned: true } : {}),
-    ...(view.assigneeId !== 'all' && view.assigneeId !== 'unassigned'
-      ? { assigneeId: view.assigneeId }
-      : {}),
-    ...(view.priority !== 'all' && isPlanePriority(view.priority)
-      ? { priority: view.priority }
-      : {}),
+    ...(view.stateIds.length ? { stateIds: view.stateIds } : {}),
+    ...(assigneeIds.length ? { assigneeIds } : {}),
+    ...(view.assigneeIds.includes('unassigned') ? { unassigned: true } : {}),
+    ...(view.priorities.length ? { priorities: view.priorities.filter(isPlanePriority) } : {}),
     ...(view.labelIds.length ? { labelIds: view.labelIds } : {})
   }
 }
@@ -66,32 +61,8 @@ export function selectPlaneWorkItems(
   items: PlaneWorkItem[],
   view: PlaneWorkItemView
 ): PlaneWorkItem[] {
-  const search = view.search.trim().toLocaleLowerCase()
-  const matching = items.filter((item) => {
-    if (search && !`${item.key} ${item.title}`.toLocaleLowerCase().includes(search)) {
-      return false
-    }
-    if (view.stateId !== 'all' && item.state.id !== view.stateId) {
-      return false
-    }
-    if (view.priority !== 'all' && item.priority !== view.priority) {
-      return false
-    }
-    if (view.labelIds.length && !item.labels.some((label) => view.labelIds.includes(label.id))) {
-      return false
-    }
-    if (view.assigneeId === 'unassigned' && item.assignees.length > 0) {
-      return false
-    }
-    if (
-      view.assigneeId !== 'all' &&
-      view.assigneeId !== 'unassigned' &&
-      !item.assignees.some((assignee) => assignee.id === view.assigneeId)
-    ) {
-      return false
-    }
-    return true
-  })
+  const filters = planeWorkItemFilters(view)
+  const matching = items.filter((item) => matchesPlaneWorkItemFilters(item, filters))
 
   const direction = view.sortDirection === 'asc' ? 1 : -1
   return matching.sort((left, right) => {

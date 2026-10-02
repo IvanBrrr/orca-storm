@@ -46,6 +46,9 @@ export const ListWorkItems = ProjectScope.extend({
   filters: z
     .object({
       search: OptionalString,
+      stateIds: z.array(z.string()).optional(),
+      assigneeIds: z.array(z.string()).optional(),
+      priorities: z.array(z.enum(PLANE_PRIORITIES)).optional(),
       stateId: OptionalString,
       assigneeId: OptionalString,
       priority: z.enum(PLANE_PRIORITIES).optional(),

@@ -12,7 +12,8 @@ const DETAIL_LIMIT = 100
 export async function loadMonitorReviewState(
   items: GitHubWorkItem[],
   repos: readonly Repo[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onItem?: (item: GitHubWorkItem) => void
 ): Promise<{ items: GitHubWorkItem[]; failed: number; limited: boolean }> {
   const unique = [...new Map(items.map((pr) => [pr.url, pr])).values()]
   const candidates = unique
@@ -41,6 +42,9 @@ export async function loadMonitorReviewState(
         : await lookupGitHubWorkItemForSource(args)
       if (!detail || detail.url !== pr.url) {
         throw new Error('Pull request state could not be confirmed')
+      }
+      if (!signal?.aborted) {
+        onItem?.(detail)
       }
       return detail
     }

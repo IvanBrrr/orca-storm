@@ -8,12 +8,23 @@ import {
 } from './plane-work-item-view-storage'
 
 describe('saved Plane Tasks view', () => {
+  it('migrates saved single selections to multi-select facets', () => {
+    localStorage.setItem(
+      'storca.plane.task-view.v1.workspace.project',
+      JSON.stringify({ stateId: 'todo', assigneeId: 'alice', priority: 'high' })
+    )
+    expect(loadPlaneWorkItemView('workspace', 'project')).toMatchObject({
+      stateIds: ['todo'],
+      assigneeIds: ['alice'],
+      priorities: ['high']
+    })
+  })
   beforeEach(() => localStorage.clear())
 
   it('restores filters and sorting for the same project without applying them to another', () => {
     const view = {
       ...loadPlaneWorkItemView('workspace', 'project'),
-      assigneeId: 'alice',
+      assigneeIds: ['alice'],
       labelIds: ['red', 'blue'],
       sortField: 'priority' as const
     }

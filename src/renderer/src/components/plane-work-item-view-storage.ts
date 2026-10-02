@@ -17,9 +17,9 @@ const SORT_FIELDS: PlaneSortField[] = [
 export function defaultPlaneWorkItemView(): PlaneWorkItemView {
   return {
     search: '',
-    stateId: 'all',
-    assigneeId: 'all',
-    priority: 'all',
+    stateIds: [],
+    assigneeIds: [],
+    priorities: [],
     labelIds: [],
     sortField: 'updated',
     sortDirection: 'desc'
@@ -36,10 +36,9 @@ export function loadPlaneWorkItemView(workspaceId: string, projectId: string): P
     }
     return {
       search: typeof value.search === 'string' ? value.search : fallback.search,
-      stateId: typeof value.stateId === 'string' ? value.stateId : fallback.stateId,
-      assigneeId: typeof value.assigneeId === 'string' ? value.assigneeId : fallback.assigneeId,
-      priority:
-        value.priority === 'all' || isPlanePriority(value.priority) ? value.priority : 'all',
+      stateIds: selectedIds(value.stateIds, value.stateId),
+      assigneeIds: selectedIds(value.assigneeIds, value.assigneeId),
+      priorities: selectedIds(value.priorities, value.priority).filter(isPlanePriority),
       labelIds: Array.isArray(value.labelIds)
         ? value.labelIds.filter((id): id is string => typeof id === 'string')
         : [],
@@ -82,4 +81,12 @@ export function savePlaneWorkItemLimit(
   } catch {
     // The current page remains usable when browser storage is unavailable.
   }
+}
+
+function selectedIds(values: unknown, legacy: unknown): string[] {
+  return Array.isArray(values)
+    ? [...new Set(values.filter((id): id is string => typeof id === 'string' && id !== 'all'))]
+    : typeof legacy === 'string' && legacy !== 'all'
+      ? [legacy]
+      : []
 }

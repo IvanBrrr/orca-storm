@@ -1,4 +1,5 @@
-import { PLANE_WORK_ITEM_KEY_PATTERN } from '../../shared/plane-work-item-url'
+import { parsePlaneWorkItemKey } from '../../shared/plane-work-item-key-search'
+export { parsePlaneWorkItemKey } from '../../shared/plane-work-item-key-search'
 import { isPlaneJsonRecord } from '../../shared/plane-json-record'
 import type {
   PlaneComment,
@@ -39,21 +40,6 @@ export type PlaneWorkItemList = {
   serverFiltered?: boolean
 }
 
-export function parsePlaneWorkItemKey(
-  key: string
-): { projectIdentifier: string; sequenceId: number } | null {
-  const trimmed = key.trim()
-  if (!PLANE_WORK_ITEM_KEY_PATTERN.test(trimmed)) {
-    return null
-  }
-  const separator = trimmed.lastIndexOf('-')
-  const sequenceId = Number.parseInt(trimmed.slice(separator + 1), 10)
-  if (!Number.isSafeInteger(sequenceId) || sequenceId <= 0) {
-    return null
-  }
-  return { projectIdentifier: trimmed.slice(0, separator).toUpperCase(), sequenceId }
-}
-
 /**
  * Resolves the human identifier shown in Plane (`PROJ-123`) through the
  * workspace-level endpoint, so no project id is needed up front.
@@ -64,7 +50,10 @@ export async function getWorkItemByKey(
   knownProject?: PlaneProject
 ): Promise<PlaneWorkItem | null> {
   const parsed = parsePlaneWorkItemKey(key)
-  if (!parsed) {
+  if (
+    !parsed ||
+    (knownProject && knownProject.identifier.toUpperCase() !== parsed.projectIdentifier)
+  ) {
     return null
   }
   const raw = await planeRequest(

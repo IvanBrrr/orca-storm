@@ -18769,6 +18769,7 @@
     "removePath": "Remove {{name}}"
   },
   "workMonitor": {
+    "noFilterOptions": "No options found",
     "loginPlaceholder": "GitHub login",
     "prNumber": "PR #{{number}}",
     "planeLabel": "Plane",

@@ -28,6 +28,10 @@ export function useTaskPageProviderState(model: TaskPageSourceAvailabilityModel)
   useEffect(() => {
     const pageTaskSourceChanged = lastPageTaskSourceRef.current !== pageData.taskSource
     lastPageTaskSourceRef.current = pageData.taskSource
+    if (pageTaskSourceChanged && !pageData.taskSource) {
+      // A generic Tasks visit preserves the source selected by the last explicit visit.
+      taskSourceManuallyChangedRef.current = true
+    }
     if (pageData.taskSource) {
       if (pageTaskSourceChanged) {
         taskSourceManuallyChangedRef.current = false

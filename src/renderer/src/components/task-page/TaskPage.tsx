@@ -17,17 +17,28 @@ export default function TaskPage(): React.JSX.Element {
   const pageData = useAppStore((s) => s.taskPageData)
   const closeTaskPage = useAppStore((s) => s.closeTaskPage)
   const activeModal = useAppStore((s) => s.activeModal)
-  useTaskPageEscape(activeModal, closeTaskPage)
+  const activeView = useAppStore((s) => s.activeView)
+  useTaskPageEscape(activeModal, closeTaskPage, activeView === 'tasks')
   const hasExplicitTarget = Object.keys(pageData).length > 0
   const [view, setView] = useState<WorkView>(hasExplicitTarget ? 'tasks' : 'attention')
+  const [tasksVisited, setTasksVisited] = useState(hasExplicitTarget)
+  const [monitorView, setMonitorView] = useState<'attention' | 'team' | null>(
+    hasExplicitTarget ? null : 'attention'
+  )
   useEffect(() => {
     if (Object.keys(pageData).length > 0) {
       setView('tasks')
+      setTasksVisited(true)
     }
   }, [pageData])
   const changeView = (value: string): void => {
     if (value === 'attention' || value === 'team' || value === 'tasks') {
       setView(value)
+      if (value === 'tasks') {
+        setTasksVisited(true)
+      } else {
+        setMonitorView(value)
+      }
     }
   }
   return (
@@ -57,9 +68,24 @@ export default function TaskPage(): React.JSX.Element {
             <TabsTrigger value="tasks">{translate('workMonitor.tasks', 'Task list')}</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value={view} className="flex min-h-0 flex-1 flex-col">
-          {view === 'tasks' ? <TaskListPage /> : <WorkMonitor view={view} />}
-        </TabsContent>
+        {tasksVisited ? (
+          <TabsContent
+            forceMount
+            value="tasks"
+            className={view === 'tasks' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}
+          >
+            <TaskListPage active={activeView === 'tasks' && view === 'tasks'} />
+          </TabsContent>
+        ) : null}
+        {monitorView ? (
+          <TabsContent
+            forceMount
+            value={monitorView}
+            className={view === 'tasks' ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
+          >
+            <WorkMonitor view={monitorView} active={activeView === 'tasks' && view !== 'tasks'} />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   )

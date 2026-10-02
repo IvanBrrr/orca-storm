@@ -189,6 +189,62 @@ describe('listWorkItems', () => {
     expect(requestedUrls()[1]).toContain('cursor=later')
   })
 
+  it.each(['301', 'PROJ-301', 'proj-301'])(
+    'searches by sequence rather than title for %s',
+    async (search) => {
+      netFetchMock.mockResolvedValueOnce(
+        jsonResponse({ data: [rawWorkItem(301)], has_more: false, pagination: { style: 'cursor' } })
+      )
+      const { listWorkItems } = await loadWorkItems()
+      const result = await listWorkItems(client, project, { filters: { search } })
+      expect(result.items[0]?.key).toBe('PROJ-301')
+      const url = new URL(requestedUrls()[0])
+      expect(url.searchParams.get('sequence_id')).toBe('301')
+      expect(url.searchParams.has('search')).toBe(false)
+    }
+  )
+
+  it('sends every chosen status, assignee and priority to Plane', async () => {
+    netFetchMock.mockResolvedValueOnce(
+      jsonResponse({ data: [], has_more: false, pagination: { style: 'cursor' } })
+    )
+    const { listWorkItems } = await loadWorkItems()
+    await listWorkItems(client, project, {
+      filters: {
+        stateIds: ['todo', 'review'],
+        assigneeIds: ['alice', 'bob'],
+        priorities: ['high', 'urgent']
+      }
+    })
+    const url = new URL(requestedUrls()[0])
+    expect(url.searchParams.get('state_id__in')).toBe('todo,review')
+    expect(url.searchParams.get('assignee_id__in')).toBe('alice,bob')
+    expect(url.searchParams.get('priority__in')).toBe('high,urgent')
+  })
+
+  it('unions assigned and unassigned reads instead of intersecting them', async () => {
+    netFetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ ...rawWorkItem(1), assignees: [{ id: 'alice', display_name: 'Alice' }] }],
+          has_more: false,
+          pagination: { style: 'cursor' }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ data: [rawWorkItem(2)], has_more: false, pagination: { style: 'cursor' } })
+      )
+    const { listWorkItems } = await loadWorkItems()
+    const result = await listWorkItems(client, project, {
+      filters: { assigneeIds: ['alice'], unassigned: true }
+    })
+    expect(result.items.map((item) => item.key)).toEqual(['PROJ-1', 'PROJ-2'])
+    const urls = requestedUrls().map((value) => new URL(value))
+    expect(urls[0].searchParams.has('assignee_id__isnull')).toBe(false)
+    expect(urls[1].searchParams.has('assignee_id__in')).toBe(false)
+    expect(urls[1].searchParams.get('assignee_id__isnull')).toBe('true')
+  })
+
   it('accepts Plane v2 offset pages when a deployment does not enable cursor paging', async () => {
     netFetchMock
       .mockResolvedValueOnce(

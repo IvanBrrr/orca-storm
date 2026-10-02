@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown } from 'lucide-react'
+import { PlaneWorkItemFilterPicker } from './plane-work-item-filter-picker'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import type {
   PlaneLabel,
   PlaneMember,
@@ -8,15 +9,7 @@ import type {
 } from '../../../shared/plane-types'
 import { PLANE_PRIORITIES } from '../../../shared/plane-types'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList
-} from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -25,7 +18,6 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import type { PlaneSortField, PlaneWorkItemView } from './plane-work-item-view'
 
@@ -88,8 +80,6 @@ export function TaskPagePlaneControls({
   view: PlaneWorkItemView
   onViewChange: (view: PlaneWorkItemView) => void
 }): React.JSX.Element {
-  const [labelsOpen, setLabelsOpen] = useState(false)
-  const [labelSearch, setLabelSearch] = useState('')
   const stateMap = new Map<string, PlaneState>(states.map((state) => [state.id, state]))
   const assigneeMap = new Map<string, PlaneMember>(assignees.map((member) => [member.id, member]))
   const labelMap = new Map<string, PlaneLabel>(labels.map((label) => [label.id, label]))
@@ -135,132 +125,46 @@ export function TaskPagePlaneControls({
           className="h-8"
         />
       </div>
-      <Select value={view.stateId} onValueChange={(stateId) => onViewChange({ ...view, stateId })}>
-        <SelectTrigger
-          size="sm"
-          aria-label={translate('auto.components.TaskPagePlaneControls.status', 'Status')}
-          className="w-36"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">
-            {translate('auto.components.TaskPagePlaneControls.allStatuses', 'All statuses')}
-          </SelectItem>
-          {stateOptions.map((state) => (
-            <SelectItem key={state.id} value={state.id}>
-              {state.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Popover open={labelsOpen} onOpenChange={setLabelsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            role="combobox"
-            aria-expanded={labelsOpen}
-            aria-label={translate('auto.components.TaskPagePlaneControls.labels', 'Labels')}
-            className="w-36 justify-between"
-          >
-            {view.labelIds.length
-              ? `${translate('auto.components.TaskPagePlaneControls.labels', 'Labels')} (${view.labelIds.length})`
-              : translate('auto.components.TaskPagePlaneControls.allLabels', 'All labels')}
-            <ChevronsUpDown className="size-3.5 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-64">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder={translate(
-                'auto.components.TaskPagePlaneControls.searchLabels',
-                'Search labels'
-              )}
-              value={labelSearch}
-              onValueChange={setLabelSearch}
-            />
-            <CommandList>
-              <CommandEmpty>
-                {translate('auto.components.TaskPagePlaneControls.noLabels', 'No labels found')}
-              </CommandEmpty>
-              {labelOptions
-                .filter((label) =>
-                  label.name.toLocaleLowerCase().includes(labelSearch.toLocaleLowerCase())
-                )
-                .map((label) => (
-                  <CommandItem
-                    key={label.id}
-                    value={label.id}
-                    onSelect={() =>
-                      onViewChange({
-                        ...view,
-                        labelIds: view.labelIds.includes(label.id)
-                          ? view.labelIds.filter((id) => id !== label.id)
-                          : [...view.labelIds, label.id]
-                      })
-                    }
-                  >
-                    <Check
-                      className={
-                        view.labelIds.includes(label.id) ? 'size-3.5' : 'size-3.5 opacity-0'
-                      }
-                    />
-                    {label.name}
-                  </CommandItem>
-                ))}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      <Select
-        value={view.assigneeId}
-        onValueChange={(assigneeId) => onViewChange({ ...view, assigneeId })}
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={translate('auto.components.TaskPagePlaneControls.assignee', 'Assignee')}
-          className="w-40"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">
-            {translate('auto.components.TaskPagePlaneControls.allAssignees', 'All assignees')}
-          </SelectItem>
-          <SelectItem value="unassigned">
-            {translate('auto.components.TaskPagePlaneControls.unassigned', 'Unassigned')}
-          </SelectItem>
-          {assigneeOptions.map((assignee) => (
-            <SelectItem key={assignee.id} value={assignee.id}>
-              {assignee.displayName}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={view.priority}
-        onValueChange={(priority) => onViewChange({ ...view, priority })}
-      >
-        <SelectTrigger
-          size="sm"
-          aria-label={translate('auto.components.TaskPagePlaneControls.priority', 'Priority')}
-          className="w-32"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">
-            {translate('auto.components.TaskPagePlaneControls.allPriorities', 'All priorities')}
-          </SelectItem>
-          {PLANE_PRIORITIES.map((priority) => (
-            <SelectItem key={priority} value={priority}>
-              {priorityLabel(priority)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <PlaneWorkItemFilterPicker
+        label={translate('auto.components.TaskPagePlaneControls.status', 'Status')}
+        allLabel={translate('auto.components.TaskPagePlaneControls.allStatuses', 'All statuses')}
+        options={stateOptions.map((state) => ({ id: state.id, label: state.name }))}
+        selected={view.stateIds}
+        onChange={(stateIds) => onViewChange({ ...view, stateIds })}
+      />
+      <PlaneWorkItemFilterPicker
+        label={translate('auto.components.TaskPagePlaneControls.labels', 'Labels')}
+        allLabel={translate('auto.components.TaskPagePlaneControls.allLabels', 'All labels')}
+        options={labelOptions.map((label) => ({ id: label.id, label: label.name }))}
+        selected={view.labelIds}
+        onChange={(labelIds) => onViewChange({ ...view, labelIds })}
+      />
+      <PlaneWorkItemFilterPicker
+        label={translate('auto.components.TaskPagePlaneControls.assignee', 'Assignee')}
+        allLabel={translate('auto.components.TaskPagePlaneControls.allAssignees', 'All assignees')}
+        options={[
+          {
+            id: 'unassigned',
+            label: translate('auto.components.TaskPagePlaneControls.unassigned', 'Unassigned')
+          },
+          ...assigneeOptions.map((member) => ({ id: member.id, label: member.displayName }))
+        ]}
+        selected={view.assigneeIds}
+        onChange={(assigneeIds) => onViewChange({ ...view, assigneeIds })}
+      />
+      <PlaneWorkItemFilterPicker
+        label={translate('auto.components.TaskPagePlaneControls.priority', 'Priority')}
+        allLabel={translate(
+          'auto.components.TaskPagePlaneControls.allPriorities',
+          'All priorities'
+        )}
+        options={PLANE_PRIORITIES.map((priority) => ({
+          id: priority,
+          label: priorityLabel(priority)
+        }))}
+        selected={view.priorities}
+        onChange={(priorities) => onViewChange({ ...view, priorities })}
+      />
       <Select
         value={view.sortField}
         onValueChange={(value) => {

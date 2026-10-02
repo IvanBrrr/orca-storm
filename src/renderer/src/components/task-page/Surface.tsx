@@ -8,27 +8,33 @@ import { TaskPageGitLabDialog } from './gitlab/Dialog'
 import { TaskPageLinearConnectDialog } from './linear/ConnectDialog'
 import { TaskPageJiraConnectDialog } from './jira/ConnectDialog'
 export function TaskPageSurface({
-  model
+  model,
+  active = true
 }: {
   model: TaskPageComposerActionsModel
+  active?: boolean
 }): React.JSX.Element {
   return (
     <div className="relative flex h-full min-h-0 flex-1 overflow-hidden bg-background text-foreground">
       <TaskPageFrame model={model} />
 
-      <TaskPageGitHubIssueDialog model={model} />
+      {active ? (
+        <>
+          <TaskPageGitHubIssueDialog model={model} />
 
-      <TaskPageLinearProjectDialog model={model} />
+          <TaskPageLinearProjectDialog model={model} />
 
-      <TaskPageLinearIssueDialog model={model} />
+          <TaskPageLinearIssueDialog model={model} />
 
-      <TaskPageJiraIssueDialog model={model} />
+          <TaskPageJiraIssueDialog model={model} />
 
-      <TaskPageGitLabDialog model={model} />
+          <TaskPageGitLabDialog model={model} />
 
-      <TaskPageLinearConnectDialog model={model} />
+          <TaskPageLinearConnectDialog model={model} />
 
-      <TaskPageJiraConnectDialog model={model} />
+          <TaskPageJiraConnectDialog model={model} />
+        </>
+      ) : null}
     </div>
   )
 }

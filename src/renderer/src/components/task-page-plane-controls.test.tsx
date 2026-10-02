@@ -13,9 +13,9 @@ afterEach(cleanup)
 
 const view: PlaneWorkItemView = {
   search: '',
-  stateId: 'all',
-  assigneeId: 'all',
-  priority: 'all',
+  stateIds: [],
+  assigneeIds: [],
+  priorities: [],
   labelIds: [],
   sortField: 'updated',
   sortDirection: 'desc'
@@ -60,7 +60,7 @@ describe('TaskPagePlaneControls', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'Status' }))
     await user.click(screen.getByRole('option', { name: 'Review' }))
-    expect(onViewChange).toHaveBeenCalledWith({ ...view, stateId: 'review' })
+    expect(onViewChange).toHaveBeenCalledWith({ ...view, stateIds: ['review'] })
 
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeInTheDocument()

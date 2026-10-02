@@ -31,6 +31,8 @@ let inFlight: { key: string; promise: Promise<void> } | null = null
 // Only the newest request may commit; an older one resolving later must not
 // overwrite it.
 let generation = 0
+let statusKey: string | null = null
+let checkedAt = 0
 
 function setState(next: PlaneConnectionState): void {
   state = next
@@ -52,7 +54,9 @@ export async function refreshPlaneConnection(settings: PlaneConnectionSettings):
     return inFlight.promise
   }
   const current = ++generation
-  setState({ ...state, checking: true, error: null })
+  const previous = statusKey === key ? state : { status: DISCONNECTED, checking: true, error: null }
+  statusKey = key
+  setState({ ...previous, checking: true, error: null })
   const promise = runStatusCheck(settings, current)
   inFlight = { key, promise }
   return promise
@@ -62,6 +66,7 @@ async function runStatusCheck(settings: PlaneConnectionSettings, current: number
   try {
     const status = await planeStatus(settings)
     if (current === generation) {
+      checkedAt = Date.now()
       setState({ status, checking: false, error: null })
     }
   } catch (cause) {
@@ -93,6 +98,8 @@ export function resetPlaneConnectionState(): void {
   state = { status: DISCONNECTED, checking: true, error: null }
   inFlight = null
   generation = 0
+  statusKey = null
+  checkedAt = 0
   listeners.clear()
 }
 
@@ -108,8 +115,17 @@ export function usePlaneConnection(): PlaneConnectionState & { refresh: () => Pr
   )
 
   useEffect(() => {
+    if (
+      statusKey === (activeRuntimeEnvironmentId ?? '') &&
+      state.status.connected &&
+      Date.now() - checkedAt < 300_000
+    ) {
+      return
+    }
     void refresh()
-  }, [refresh])
+  }, [refresh, activeRuntimeEnvironmentId])
 
-  return { ...snapshot, refresh }
+  return statusKey === (activeRuntimeEnvironmentId ?? '')
+    ? { ...snapshot, refresh }
+    : { status: DISCONNECTED, checking: true, error: null, refresh }
 }

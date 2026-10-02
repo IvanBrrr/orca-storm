@@ -111,6 +111,9 @@ export type PlaneWorkItem = {
 }
 
 export type PlaneWorkItemListFilters = {
+  stateIds?: string[]
+  assigneeIds?: string[]
+  priorities?: PlanePriority[]
   search?: string
   stateId?: string
   assigneeId?: string

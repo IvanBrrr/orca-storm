@@ -183,6 +183,10 @@
         "f294c500ef": "No GitLab work matches this filter.",
         "fe28c9821f": "view"
       },
+      "TaskPagePlaneControls": {
+        "noLabels": "No labels found",
+        "searchLabels": "Search labels"
+      },
       "Terminal": {
         "cdc9ac4b2d": "editor"
       },
@@ -2799,15 +2803,12 @@
         }
       },
       "status": {
+        "failedAfter": "Failed after {{value0}}",
+        "interruptedAfter": "Interrupted after {{value0}}",
         "responding": "Agent is responding",
         "toggleDetails": "Toggle turn details",
         "workedFor": "Worked for {{value0}}",
-        "interruptedAfter": "Interrupted after {{value0}}",
-        "failedAfter": "Failed after {{value0}}",
         "workingFor": "Working for {{value0}}"
-      },
-      "subagents": {
-        "unnamed": "Subagent"
       },
       "tool": {
         "countN": "{{value0}} tool calls",

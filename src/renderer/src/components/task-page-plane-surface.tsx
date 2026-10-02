@@ -1,3 +1,4 @@
+import { planeWorkItemSearchKey } from '../../../shared/plane-work-item-key-search'
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw, Star } from 'lucide-react'
 import type { PlaneProject, PlaneWorkItem } from '../../../shared/plane-types'
@@ -35,7 +36,11 @@ import {
 } from '@/components/ui/select'
 import { usePlaneConnection } from '@/hooks/usePlaneConnection'
 import { translate } from '@/i18n/i18n'
-import { planeListProjects, planeListWorkItems } from '@/runtime/runtime-plane-client'
+import {
+  planeListProjects,
+  planeListWorkItems,
+  planeGetWorkItem
+} from '@/runtime/runtime-plane-client'
 import { useAppStore } from '@/store'
 
 const MAX_LOADED_ITEMS = 2000
@@ -50,7 +55,7 @@ export function TaskPagePlaneSurface({
   const { status, checking, error: statusError, refresh } = usePlaneConnection()
   const [connectOpen, setConnectOpen] = useState(false)
 
-  if (checking) {
+  if (checking && !status.connected) {
     return (
       <div className="flex justify-center py-14">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -112,7 +117,10 @@ function PlaneWorkspaceWorkItems({
   workspaceId: string
   onStartWorkspace: (item: PlaneWorkItem) => void
 }): React.JSX.Element {
-  const settings = useAppStore((state) => state.settings)
+  const activeRuntimeEnvironmentId = useAppStore(
+    (state) => state.settings?.activeRuntimeEnvironmentId
+  )
+  const settings = useMemo(() => ({ activeRuntimeEnvironmentId }), [activeRuntimeEnvironmentId])
   const [projects, setProjects] = useState<PlaneProject[]>([])
   const [projectId, setProjectId] = useState('')
   const [defaultProjectId, setDefaultProjectId] = useState(() =>
@@ -130,11 +138,17 @@ function PlaneWorkspaceWorkItems({
   const [debouncedSearch, setDebouncedSearch] = useState(view.search)
   const project = projects.find((entry) => entry.id === projectId)
   const orderBy = planeWorkItemOrderBy(view)
-  const { stateId, assigneeId, priority, labelIds } = view
+  const { stateIds, assigneeIds, priorities, labelIds } = view
   const filters = useMemo(
     () =>
-      planeWorkItemFilters({ stateId, assigneeId, priority, labelIds, search: debouncedSearch }),
-    [stateId, assigneeId, priority, labelIds, debouncedSearch]
+      planeWorkItemFilters({
+        stateIds,
+        assigneeIds,
+        priorities,
+        labelIds,
+        search: debouncedSearch
+      }),
+    [stateIds, assigneeIds, priorities, labelIds, debouncedSearch]
   )
   const visibleItems = useMemo(() => selectPlaneWorkItems(items, view), [items, view])
 
@@ -187,7 +201,15 @@ function PlaneWorkspaceWorkItems({
     let cancelled = false
     setLoading(true)
     setError(null)
-    void planeListWorkItems(settings, { project, workspaceId, limit, orderBy, filters })
+    const key = planeWorkItemSearchKey(debouncedSearch, project.identifier)
+    const request = key
+      ? planeGetWorkItem(settings, { key, project, workspaceId }).then((item) => ({
+          items: item ? [item] : [],
+          truncated: false,
+          serverFiltered: false
+        }))
+      : planeListWorkItems(settings, { project, workspaceId, limit, orderBy, filters })
+    void request
       .then((result) => {
         if (!cancelled) {
           setItems(result.items)
@@ -216,7 +238,7 @@ function PlaneWorkspaceWorkItems({
     return () => {
       cancelled = true
     }
-  }, [project, refreshNonce, settings, limit, orderBy, filters, workspaceId])
+  }, [project, refreshNonce, settings, limit, orderBy, filters, workspaceId, debouncedSearch])
 
   const changeProject = (nextProjectId: string): void => {
     setItems([])

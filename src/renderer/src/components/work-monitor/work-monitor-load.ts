@@ -33,7 +33,8 @@ export async function loadMonitorSnapshot(
   settings: RuntimePlaneSettings,
   status: PlaneConnectionStatus,
   projectId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onProgress?: (snapshot: MonitorSnapshot) => void
 ): Promise<MonitorSnapshot> {
   const snapshot: MonitorSnapshot = {
     github: [],
@@ -43,6 +44,18 @@ export async function loadMonitorSnapshot(
     limited: false,
     fetchedAt: '',
     planeViewerIds: {}
+  }
+  const publish = (): void => {
+    if (!signal?.aborted) {
+      onProgress?.({
+        ...snapshot,
+        github: [...snapshot.github],
+        plane: [...snapshot.plane],
+        projects: [...snapshot.projects],
+        errors: [...snapshot.errors],
+        planeViewerIds: { ...snapshot.planeViewerIds }
+      })
+    }
   }
   const repoArgs = repos.map((repo) => ({
     repoId: repo.id,
@@ -62,6 +75,7 @@ export async function loadMonitorSnapshot(
           allowStaleFallback: false
         })
       snapshot.github.push(...result.items)
+      publish()
       if (result.failedCount || result.requestFailureCount) {
         snapshot.errors.push(
           `GitHub: ${result.requestFailureCount ?? result.failedCount} source(s) unavailable`
@@ -70,12 +84,30 @@ export async function loadMonitorSnapshot(
       if (result.items.length >= 100) {
         snapshot.limited = true
       }
+      if (query === 'is:pr is:open') {
+        const reviews = await loadMonitorReviewState(result.items, repos, signal, (pr) => {
+          snapshot.github = snapshot.github.map((item) => (item.url === pr.url ? pr : item))
+          publish()
+        })
+        snapshot.limited ||= reviews.limited
+        if (reviews.failed) {
+          snapshot.errors.push(
+            translate(
+              'workMonitor.stateErrors',
+              'Detailed review or check states unavailable for {{count}} PRs. Their missing states remain unknown.',
+              { count: reviews.failed }
+            )
+          )
+        }
+      }
+      publish()
     }),
     ...(status.connected
       ? [
           (async function loadPlane(): Promise<void> {
             const workspaceId = status.selectedWorkspaceId ?? status.activeWorkspaceId ?? undefined
             snapshot.projects = await planeListProjects(settings, { workspaceId })
+            publish()
             const projects =
               projectId === 'all'
                 ? snapshot.projects
@@ -125,6 +157,7 @@ export async function loadMonitorSnapshot(
               })
               snapshot.plane.push(...result.items)
               snapshot.limited ||= result.truncated
+              publish()
             })
             responses.forEach((result, index) => {
               if (result.status === 'rejected' && !isPlaneProjectAccessDenied(result.reason)) {
@@ -142,18 +175,6 @@ export async function loadMonitorSnapshot(
       snapshot.errors.push(errorMessage(result.reason))
     }
   })
-  const reviews = await loadMonitorReviewState(snapshot.github, repos, signal)
-  snapshot.github = reviews.items
-  snapshot.limited ||= reviews.limited
-  if (reviews.failed) {
-    snapshot.errors.push(
-      translate(
-        'workMonitor.stateErrors',
-        'Detailed review or check states unavailable for {{count}} PRs. Their missing states remain unknown.',
-        { count: reviews.failed }
-      )
-    )
-  }
   snapshot.fetchedAt = new Date().toISOString()
   return snapshot
 }

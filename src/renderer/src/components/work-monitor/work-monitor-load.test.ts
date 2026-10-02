@@ -61,6 +61,40 @@ beforeEach(() => {
 })
 
 describe('monitor snapshot loading', () => {
+  it('publishes loaded tasks without waiting for a slower project', async () => {
+    listProjects.mockResolvedValue(projects.slice(0, 2))
+    let finishSlowProject:
+      | ((value: { items: PlaneWorkItem[]; truncated: boolean }) => void)
+      | undefined
+    const slowProject = new Promise<{ items: PlaneWorkItem[]; truncated: boolean }>((resolve) => {
+      finishSlowProject = resolve
+    })
+    listItems
+      .mockResolvedValueOnce({ items: [task], truncated: false })
+      .mockReturnValueOnce(slowProject)
+    const onProgress = vi.fn()
+    let finished = false
+    const loading = loadMonitorSnapshot(
+      [],
+      null,
+      { connected: true, viewer: null },
+      'all',
+      undefined,
+      onProgress
+    ).then((snapshot) => {
+      finished = true
+      return snapshot
+    })
+    await vi.waitFor(() => {
+      expect(onProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ plane: [task], fetchedAt: '' })
+      )
+    })
+    expect(finished).toBe(false)
+    finishSlowProject?.({ items: [], truncated: false })
+    expect((await loading).plane).toEqual([task])
+  })
+
   it('uses the actual user read rather than the workspace projection in status', async () => {
     listProjects.mockResolvedValue([projects[0]])
     const assigned = { ...task, assignees: [{ id: 'actual-user', displayName: 'Alice' }] }
