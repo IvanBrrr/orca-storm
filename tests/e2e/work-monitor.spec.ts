@@ -162,7 +162,7 @@ test('work monitor renders personal turns, linked details and team queues', asyn
   await expect(detail.getByText('CHANGES_REQUESTED', { exact: true })).toBeVisible()
   await expect(detail.getByText('DEV-42 · Plane', { exact: true })).toBeVisible()
   await expect(detail.getByText('Please keep the reconnect retry bounded.')).toBeVisible()
-  await expect(detail.getByText('1 unresolved review threads in loaded comments')).toBeVisible()
+  await expect(detail.getByText(/1 unresolved threads found.*total is unknown/)).toBeVisible()
   await orcaPage.screenshot({
     path: testInfo.outputPath('work-monitor-detail.png'),
     animations: 'disabled'

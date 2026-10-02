@@ -53,7 +53,7 @@ export function WorkMonitorActivity({ row }: { row: MonitorRow }): React.JSX.Ele
   return (
     <section className="space-y-3 border-t border-border pt-4">
       <h3 className="text-sm font-medium">
-        {translate('workMonitor.activity', 'Recent PR comments')}
+        {translate('workMonitor.activity', 'Available PR comments')}
       </h3>
       {!current ? (
         <p className="text-xs text-muted-foreground">
@@ -71,8 +71,8 @@ export function WorkMonitorActivity({ row }: { row: MonitorRow }): React.JSX.Ele
           ) : null}
           <p className="text-xs text-muted-foreground">
             {translate(
-              'workMonitor.unresolved',
-              '{{count}} unresolved review threads in loaded comments',
+              'workMonitor.commentCoverage',
+              '{{count}} unresolved threads found in available comments. Results may be cached or partial; the total is unknown.',
               { count: unresolved }
             )}
           </p>
