@@ -16,6 +16,7 @@ import {
 import { useAppStore } from '@/store'
 import { loadMonitorReviewState } from './work-monitor-review-state'
 import { translate } from '@/i18n/i18n'
+import { compactIpcErrorMessage } from '@/lib/ipc-error'
 
 export type MonitorSnapshot = {
   github: GitHubWorkItem[]
@@ -126,7 +127,7 @@ export async function loadMonitorSnapshot(
               snapshot.limited ||= result.truncated
             })
             responses.forEach((result, index) => {
-              if (result.status === 'rejected') {
+              if (result.status === 'rejected' && !isPlaneProjectAccessDenied(result.reason)) {
                 snapshot.errors.push(
                   `Plane · ${projects[index].name}: ${errorMessage(result.reason)}`
                 )
@@ -159,4 +160,12 @@ export async function loadMonitorSnapshot(
 
 function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
+}
+
+function isPlaneProjectAccessDenied(cause: unknown): boolean {
+  // IPC drops the HTTP status; match only Plane's project permission response.
+  const message = compactIpcErrorMessage(errorMessage(cause)) ?? ''
+  return /^(?:PlaneApiError:\s*)?You (?:don't|do not) have permission to view this workitem\.?$/i.test(
+    message
+  )
 }

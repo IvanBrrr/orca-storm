@@ -193,4 +193,29 @@ describe('monitor snapshot loading', () => {
     expect(listItems).toHaveBeenCalledTimes(1)
     expect(listItems.mock.calls[0][1].project.id).toBe('project-3')
   })
+
+  it.each([
+    "You don't have permission to view this workitem",
+    "Error invoking remote method 'plane:listWorkItems': Error: You don't have permission to view this workitem",
+    "PlaneApiError: You don't have permission to view this workitem"
+  ])('skips an inaccessible project without reporting an error: %s', async (message) => {
+    listProjects.mockResolvedValue(projects.slice(0, 2))
+    listItems
+      .mockResolvedValueOnce({ items: [task], truncated: false })
+      .mockRejectedValueOnce(new Error(message))
+    const result = await loadMonitorSnapshot([], null, { connected: true, viewer: null }, 'all')
+    expect(result.plane).toEqual([task])
+    expect(result.errors).toEqual([])
+    expect(result.limited).toBe(false)
+  })
+
+  it.each(['Invalid API token', 'Forbidden', 'Request timed out', 'permission denied'])(
+    'keeps unexpected project failures visible: %s',
+    async (message) => {
+      listProjects.mockResolvedValue([projects[0]])
+      listItems.mockRejectedValue(new Error(message))
+      const result = await loadMonitorSnapshot([], null, { connected: true, viewer: null }, 'all')
+      expect(result.errors).toEqual([`Plane · Project 0: ${message}`])
+    }
+  )
 })
