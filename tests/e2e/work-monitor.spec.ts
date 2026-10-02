@@ -90,8 +90,16 @@ test('work monitor renders personal turns, linked details and team queues', asyn
         ok: true,
         viewer: { id: 'plane-alice', displayName: 'Alice', email: null }
       }))
-      ipcMain.handle('plane:listProjects', () => [project])
-      ipcMain.handle('plane:listWorkItems', () => ({ items: tasks, truncated: false }))
+      ipcMain.handle('plane:listProjects', () => [
+        project,
+        { ...project, id: 'private-project', name: 'Private project' }
+      ])
+      ipcMain.handle('plane:listWorkItems', (_event, args: { project: { id: string } }) => {
+        if (args.project.id === 'private-project') {
+          throw new Error("You don't have permission to view this workitem")
+        }
+        return { items: tasks, truncated: false }
+      })
     },
     { prs, tasks, project }
   )
