@@ -25,7 +25,7 @@ import {
   type StructuredAgentSessionMutationContext
 } from './structured-agent-session-mutation-context'
 import {
-  openForWrite,
+  openForProviderWrite,
   openWithAgent,
   sendPreparation,
   structuredAgentSessionSendBlock
@@ -61,7 +61,8 @@ export function sendStructuredAgentSessionTurn(
      *  prompt never set it. */
     userSend?: true
     beforeRun?: () => void
-  }
+  },
+  arrival?: Parameters<typeof sendPreparation>[2]
 ): Promise<AgentSessionMutationResult<AgentSessionSendResult>> {
   const plan = sendPlan(params)
   return mutateStructuredAgentSession(
@@ -80,7 +81,7 @@ export function sendStructuredAgentSessionTurn(
             (await plan.run(ctx))
         )
     },
-    sendPreparation(context, params.envelope)
+    sendPreparation(context, params.envelope, arrival)
   )
 }
 
@@ -101,7 +102,7 @@ export function cancelStructuredAgentSessionTurn(
       caller,
       params.envelope,
       cancelPlan({ ...params, childWork: () => context.readChildWork(params.envelope.sessionId) }),
-      openForWrite(context, params.envelope)
+      openForProviderWrite(context, params.envelope)
     )
   }
   const plan = cancelPlan(params)
@@ -130,7 +131,7 @@ export function respondToStructuredAgentSessionPrompt(
     caller,
     params.envelope,
     promptPlan(params),
-    openForWrite(context, params.envelope)
+    openForProviderWrite(context, params.envelope)
   )
 }
 
@@ -159,7 +160,7 @@ export async function setStructuredAgentSessionOption(
           ? recordStructuredAgentSessionOptionIntent(context.deps.store, ctx, params)
           : plan.run(ctx)
     },
-    openForWrite(context, params.envelope)
+    openForProviderWrite(context, params.envelope)
   )
 }
 

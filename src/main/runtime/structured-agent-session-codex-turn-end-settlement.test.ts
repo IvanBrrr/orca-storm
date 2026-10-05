@@ -34,11 +34,18 @@ import {
   ensureStructuredAgentSessionHost,
   stopStructuredAgentSessionRuntime
 } from './structured-agent-session-runtime'
+import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
+import { createCoordinatorMailObservationClock } from './structured-chat-coordinator-observation-clock.test-fixture'
 
 // The turns a send or Stop is waiting on to open, so a test knows the wait began.
 const openWaits = vi.hoisted(() => {
-  const turnIds: string[] = []
-  return { turnIds }
+  const state: {
+    turnIds: string[]
+    ended: string[]
+    began: (() => void) | null
+    releaseAll: (() => void) | null
+  } = { turnIds: [], ended: [], began: null, releaseAll: null }
+  return state
 })
 vi.mock('../codex/codex-structured-turn-open-wait', async (importOriginal) => {
   const actual = await importOriginal<typeof CodexTurnOpenWait>()
@@ -46,11 +53,16 @@ vi.mock('../codex/codex-structured-turn-open-wait', async (importOriginal) => {
     ...actual,
     createCodexTurnOpenWaits: () => {
       const waits = actual.createCodexTurnOpenWaits()
+      openWaits.releaseAll = waits.releaseAll
       return {
         ...waits,
         wait: (turnId: string, withinMs: number) => {
           openWaits.turnIds.push(turnId)
-          return waits.wait(turnId, withinMs)
+          const pending = waits.wait(turnId, withinMs)
+          openWaits.began?.()
+          return pending.then(() => {
+            openWaits.ended.push(turnId)
+          })
         }
       }
     }
@@ -169,6 +181,8 @@ function verdictOf(submissions: readonly AgentJournalSubmission[], clientMessage
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'orca-codex-turn-end-'))
   openWaits.turnIds.length = 0
+  openWaits.ended.length = 0
+  openWaits.began = null
   answers = 0
   steers = 0
   interrupts = 0
@@ -217,6 +231,7 @@ beforeEach(async () => {
     return connection
   }
   host = await ensureStructuredAgentSessionHost({
+    logger: createStructuredAgentSessionLogger(),
     stateDirectory: root,
     hostId: 'local',
     claimKeyId: 'key-1',
@@ -237,6 +252,8 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  openWaits.releaseAll?.()
+  vi.useRealTimers()
   await stopStructuredAgentSessionRuntime()
   await rm(root, { recursive: true, force: true })
 })
@@ -285,6 +302,71 @@ describe('a Codex send its turn ended without taking it', () => {
     expect(verdictOf(after.submissions, followUp)).toBe('withdrawn')
     expect(after.owesWork).toBe(false)
   })
+})
+
+describe('a queued card sent now into the turn a Stop ends', () => {
+  async function handoffs(messageId: string): Promise<AgentJournalSubmission[]> {
+    return (await settled()).submissions.filter((entry) => entry.queuedMessageId === messageId)
+  }
+
+  /** Each hand-off of the card, as who sent it and how it settled. */
+  async function sends(messageId: string) {
+    return (await handoffs(messageId)).map((entry) => ({
+      origin: entry.origin,
+      verdict: verdictOf([entry], entry.clientMessageId)
+    }))
+  }
+
+  async function queue() {
+    const page = await host.history({ sessionId: SESSION, direction: 'tail' })
+    if (!page.ok) {
+      throw new Error('history refused')
+    }
+    return {
+      pause: page.page.queuePause ?? null,
+      cards: (page.page.queuedMessages ?? []).map(({ messageId, state }) => ({ messageId, state }))
+    }
+  }
+
+  it('comes back as a paused waiting card, and nothing sends it again', async () => {
+    const opening = await send('look around')
+    await vi.waitFor(() => expect(answers).toBe(1))
+    turns.start()
+    turns.echo(opening)
+    const { messageId: cardId } = await queueThenSendNow('and check the tests')
+    // Steered into the running turn, with no echo yet.
+    await vi.waitFor(() => expect(steers).toBe(1))
+    const [steered] = await handoffs(cardId)
+    expect(steered?.dispatchState).toBe('pending')
+
+    await stop('turn-1')
+
+    await vi.waitFor(async () => {
+      const [withdrawn] = await handoffs(cardId)
+      expect(verdictOf([withdrawn!], withdrawn!.clientMessageId)).toBe('withdrawn')
+    })
+    await vi.waitFor(
+      async () =>
+        expect({ ...(await queue()), sends: await sends(cardId) }).toEqual({
+          pause: { reason: 'stopped' },
+          cards: [{ messageId: cardId, state: 'waiting' }],
+          sends: [{ origin: 'client', verdict: 'withdrawn' }]
+        }),
+      { timeout: 5_000 }
+    )
+    // A drain ignoring the pause re-sends only after the stopped turn ends: watch past that.
+    await vi.waitFor(() => expect(turns.turnId).toBeNull())
+    const clock = createCoordinatorMailObservationClock(() => host, SESSION)
+    clock.start()
+    try {
+      await clock.observe(2_500)
+      await host.collaboratorsForTests().serialize(SESSION, async () => {})
+    } finally {
+      clock.restore()
+    }
+    expect(steers + answers).toBe(2)
+    expect(await sends(cardId)).toEqual([{ origin: 'client', verdict: 'withdrawn' }])
+  }, 20_000)
 })
 
 describe('a Codex before 0.148, which names a steered start falsely', () => {
@@ -394,9 +476,17 @@ describe('a Stop sent after Codex answered a cold send, before it opened the tur
     const sent = await send('look around')
     await vi.waitFor(() => expect(answers).toBe(1))
 
+    await host.flushStreamedEvents(SESSION)
+    const began = Promise.withResolvers<void>()
+    openWaits.began = began.resolve
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     const stopping = stop()
+    await began.promise
     // Without the wait, it would reach Codex now, which would refuse it, and be done.
-    expect(await settledWithin(stopping, 1_000)).toBe('held')
+    const held = settledWithin(stopping, 1_000)
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(openWaits.ended).toEqual([])
+    expect(await held).toBe('held')
     expect(interrupts).toBe(0)
     turns.start()
     await stopping
@@ -420,8 +510,15 @@ describe('a Stop in that window that the turn never opens for', () => {
   async function waitingStop(): Promise<{ stopping: Promise<void> }> {
     await send('look around')
     await vi.waitFor(() => expect(answers).toBe(1))
+    await host.flushStreamedEvents(SESSION)
+    const began = Promise.withResolvers<void>()
+    openWaits.began = began.resolve
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     const stopping = stop()
-    expect(await settledWithin(stopping, 200)).toBe('held')
+    await began.promise
+    const held = settledWithin(stopping, 200)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(await held).toBe('held')
     return { stopping }
   }
 
@@ -439,10 +536,17 @@ describe('a Stop in that window that the turn never opens for', () => {
     const { stopping } = await waitingStop()
 
     const closing = host.close(SESSION, 'evict')
+    const closedWithinBound = settledWithin(
+      closing,
+      CODEX_TURN_OPEN_WAIT_MS + CHILD_EVICTION_TIMEOUT_MS
+    )
+    await vi.advanceTimersByTimeAsync(CODEX_TURN_OPEN_WAIT_MS - 201)
+    expect(openWaits.ended).toEqual([])
+    expect(childCloses).toBe(0)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(openWaits.ended).toEqual(['turn-1'])
 
-    expect(
-      await settledWithin(closing, CODEX_TURN_OPEN_WAIT_MS + CHILD_EVICTION_TIMEOUT_MS)
-    ).not.toBe('held')
+    expect(await closedWithinBound).not.toBe('held')
     expect(await settledWithin(stopping, 0)).not.toBe('held')
     expect(childCloses).toBe(1)
     expect(interrupts).toBe(0)
@@ -452,9 +556,16 @@ describe('a Stop in that window that the turn never opens for', () => {
   it('lets the app quit behind it within the eviction budget, and still close the child', async () => {
     await waitingStop()
 
-    expect(
-      await settledWithin(stopStructuredAgentSessionRuntime(), CHILD_EVICTION_TIMEOUT_MS)
-    ).not.toBe('held')
+    const quitWithinBound = settledWithin(
+      stopStructuredAgentSessionRuntime(),
+      CHILD_EVICTION_TIMEOUT_MS
+    )
+    await vi.advanceTimersByTimeAsync(CODEX_TURN_OPEN_WAIT_MS - 201)
+    expect(openWaits.ended).toEqual([])
+    expect(childCloses).toBe(0)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(openWaits.ended).toEqual(['turn-1'])
+    expect(await quitWithinBound).not.toBe('held')
     expect(childCloses).toBe(1)
   })
 })

@@ -1,3 +1,54 @@
+# Storca (Шторка)
+
+Наш форк [Orca](https://github.com/stablyai/orca) с интеграцией Plane. Готовые сборки публикуются в [релизах Storca](https://github.com/IvanBrrr/orca-storm/releases/latest).
+
+## Установка Storca на macOS
+
+1. Скачайте DMG для своего процессора: [Apple Silicon (M1 и новее, arm64)](https://github.com/IvanBrrr/orca-storm/releases/latest/download/storca-macos-arm64.dmg) или [Intel (x64)](https://github.com/IvanBrrr/orca-storm/releases/latest/download/storca-macos-x64.dmg). Тип процессора указан в меню Apple → Об этом Mac.
+2. Откройте DMG и перенесите `Storca.app` в `/Applications`. Если нет прав на эту папку, используйте `~/Applications`. При обновлении сначала закройте Storca и замените старое приложение.
+3. Запустите Storca из папки приложений. Для сборки без подписи Apple Developer macOS может потребовать разрешить запуск в Системных настройках → Конфиденциальность и безопасность → Всё равно открыть. Разрешайте только сборку, которую скачали из этого репозитория. [Инструкция Apple](https://support.apple.com/en-ph/102445).
+
+Storca устанавливается отдельно от официальной Orca. Ворктри и сессии общие, настройки Storca хранятся отдельно.
+
+Чтобы включить ежедневное обновление на Mac, выполните из локального checkout этого репозитория:
+
+```bash
+bash config/scripts/install-storm-macos-updater.sh
+```
+
+Проверка выполняется при входе в систему и ежедневно в 10:00 по местному времени. Обновление устанавливается, только когда Storca закрыта. Подробности и расположение логов: [обновление Storca на macOS](config/scripts/storm-macos-scheduled-updates.md).
+
+## Установка Storca на Windows
+
+1. Скачайте [установщик Storca для Windows (.exe)](https://github.com/IvanBrrr/orca-storm/releases/latest/download/storca-windows-setup.exe).
+2. Запустите установщик и завершите установку. При обновлении закройте Storca перед запуском установщика.
+3. Откройте Storca через меню Пуск или ярлык. Официальную Orca удалять не требуется.
+
+## Как отключить обновление по крону
+
+На Mac расписание Storca работает через `launchd`. Если включали его нашим скриптом, выполните из checkout репозитория:
+
+```bash
+bash config/scripts/install-storm-macos-updater.sh --uninstall
+```
+
+Если checkout уже удалён, отключите задание и удалите его файлы напрямую:
+
+```bash
+launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.ivanbrrr.orcastorm.updater.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.ivanbrrr.orcastorm.updater.plist" \
+  "$HOME/Library/Application Support/Storca/update-storm-macos.sh" \
+  "$HOME/Library/Application Support/Orca Storm/update-storm-macos.sh"
+```
+
+Это удаляет только локальное расписание и скрипт обновления. Приложение, настройки, сессии и ворктри сохраняются. Если вручную добавляли запись в настоящий cron, удалите строку запуска `update-storm-macos.sh` через `crontab -e`.
+
+Отдельно в репозитории настроена ежедневная сборка с вмерживанием upstream в 02:17 UTC. Чтобы отключить именно её, удалите блок `schedule` с `cron: '17 2 * * *'` из [`.github/workflows/storm-build.yml`](.github/workflows/storm-build.yml) и сохраните изменение в `main`. Сборки по push и ручной запуск останутся доступны.
+
+---
+
+Ниже сохранена документация исходной Orca. Её ссылки на скачивание и Homebrew устанавливают официальную Orca; для Storca используйте ссылки выше.
+
 <h1 align="center">
   <a href="https://onOrca.dev"><img src="resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
 </h1>
@@ -36,7 +87,7 @@
 
 Monitor and steer your agents from your phone — get notified when an agent finishes and send follow-ups from anywhere.
 
-[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK 0.0.50](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.50/app-release.apk) · [Docs →](https://www.onorca.dev/docs/mobile)
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK 0.0.52](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [Docs →](https://www.onorca.dev/docs/mobile)
 
 </td>
 <td width="50%">
@@ -235,7 +286,7 @@ yay -S stably-orca-bin
 Pair with your desktop app to monitor and steer your agents from your phone.
 
 - **iOS:** [Download on the App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
-- **Android:** [Download APK 0.0.50](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.50/app-release.apk) · [Install guide](https://www.onorca.dev/docs/android-apk)
+- **Android:** [Download APK 0.0.52](https://github.com/stablyai/orca/releases/download/mobile-android-v0.0.52/app-release.apk) · [Install guide](https://www.onorca.dev/docs/android-apk)
 
 ---
 
