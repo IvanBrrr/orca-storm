@@ -267,16 +267,17 @@ export function buildPtyHostEnv(
       baseEnv.ORCA_WSL_CLI_DIR = managedCliDir
     }
   } else {
-    if (!opts.isPackaged) {
-      baseEnv.ORCA_USER_DATA_PATH ??= opts.userDataPath
-    }
+    baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
     delete baseEnv.ORCA_CLI_COMMAND
   }
-  prependOrcaCliDirToChildPath(baseEnv, {
+  const cliLauncher = prependOrcaCliDirToChildPath(baseEnv, {
     isPackaged: opts.isPackaged,
     userDataPath: opts.userDataPath,
     resourcesPath: opts.resourcesPath
   })
+  if (!opts.isWsl && cliLauncher) {
+    baseEnv.ORCA_CLI_COMMAND = cliLauncher
+  }
 
   if (
     opts.routeBrowserOpensToClient === true &&

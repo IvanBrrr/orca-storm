@@ -473,6 +473,10 @@ module.exports = {
         to: 'bin/orca-storm.exe'
       },
       {
+        from: 'native/windows-cli-launcher/.build/orca.exe',
+        to: 'bin/orca.exe'
+      },
+      {
         from: 'node_modules/agent-browser/bin/agent-browser-win32-x64.exe',
         to: 'agent-browser-win32-x64.exe'
       },
@@ -565,6 +569,10 @@ module.exports = {
       {
         from: 'resources/darwin/bin/orca',
         to: 'bin/orca-storm'
+      },
+      {
+        from: 'resources/darwin/bin/orca',
+        to: 'bin/orca'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-darwin-${arch}',
@@ -718,7 +726,7 @@ function chmodUnixCliLaunchers(resourcesDir, electronPlatformName) {
   if (electronPlatformName === 'win32') {
     return
   }
-  for (const launcherName of ['orca-storm']) {
+  for (const launcherName of ['orca-storm', 'orca']) {
     const launcherPath = join(resourcesDir, 'bin', launcherName)
     if (!existsSync(launcherPath)) {
       continue

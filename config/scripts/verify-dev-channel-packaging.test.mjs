@@ -34,6 +34,18 @@ afterEach(() => {
 })
 
 describe('electron-builder dev-channel identity', () => {
+  it('ships bare orca beside the Storca CLI for managed macOS and Windows sessions', () => {
+    const config = loadConfigWithEnv({})
+    expect(config.mac.extraResources).toContainEqual({
+      from: 'resources/darwin/bin/orca',
+      to: 'bin/orca'
+    })
+    expect(config.win.extraResources).toContainEqual({
+      from: 'native/windows-cli-launcher/.build/orca.exe',
+      to: 'bin/orca.exe'
+    })
+  })
+
   it('keeps unsigned Windows builds pointed at the Storm repository', () => {
     const config = loadConfigWithEnv({})
 
