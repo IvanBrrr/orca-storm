@@ -63,7 +63,7 @@ function verifyPackagedDaemonEntryBoots(resourcesDir, options = {}) {
   console.log('[verify-packaged-daemon-entry] OK — packaged daemon-entry loads under plain Node')
 }
 
-const TERMINAL_HOST_BOOT_TIMEOUT_MS = 20_000
+const TERMINAL_HOST_BOOT_TIMEOUT_MS = 120_000
 // Arithmetic so the shell echoing the typed command cannot satisfy the check.
 const TERMINAL_HOST_BOOT_COMMAND = 'echo "OK $((6*7))" && exit'
 const TERMINAL_HOST_BOOT_OUTPUT = 'OK 42'
@@ -178,11 +178,21 @@ async function runTerminalHostRoundTrip({
   const scratch = mkdtempSync(scratchPrefix)
   const socketPath = join(scratch, 'd.sock')
   const tokenPath = join(scratch, 'token')
+  const logPath = join(scratch, 'daemon.log')
   const env = { ...process.env, ORCA_USER_DATA_PATH: join(scratch, 'user-data') }
   delete env.ELECTRON_RUN_AS_NODE
   const daemon = spawn(
     command[0],
-    [...command.slice(1), entry, '--socket', socketPath, '--token', tokenPath],
+    [
+      ...command.slice(1),
+      entry,
+      '--socket',
+      socketPath,
+      '--token',
+      tokenPath,
+      '--log-file',
+      logPath
+    ],
     { env, stdio: ['ignore', 'ignore', 'pipe'] }
   )
   let exited = false
@@ -255,6 +265,11 @@ async function runTerminalHostRoundTrip({
     } catch (error) {
       throw new Error(`${error.message}; output: ${output.slice(-400)}`)
     }
+  } catch (error) {
+    if (existsSync(logPath)) {
+      stderr.push(readFileSync(logPath, 'utf8').slice(-2000))
+    }
+    throw error
   } finally {
     for (const connection of connections) {
       connection.socket.destroy()

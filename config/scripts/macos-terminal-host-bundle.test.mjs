@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync
@@ -32,7 +33,9 @@ const {
 const { macCommandPrefixForArch } = require('./verify-packaged-daemon-entry.cjs')
 const electronBuilderConfig = require('../electron-builder.config.cjs')
 
-const usageDescriptions = electronBuilderConfig.mac.extendInfo
+const usageDescriptions = Object.fromEntries(
+  Object.entries(electronBuilderConfig.mac.extendInfo).filter(([key]) => key.startsWith('NS'))
+)
 const appInfo = { CFBundleIdentifier: 'com.stablyai.orca', CFBundleShortVersionString: '1.4.300' }
 const expectations = { appId: 'com.stablyai.orca', usageDescriptions, minimumOs: '13.5' }
 
@@ -147,7 +150,7 @@ describe.skipIf(process.platform !== 'darwin')('terminal host assembly', () => {
   let appPath
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'orca-terminal-host-'))
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'orca-terminal-host-')))
     appPath = join(root, 'Orca.app')
     const resources = join(appPath, 'Contents', 'Resources')
     const out = join(resources, 'app.asar.unpacked', 'out')
