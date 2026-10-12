@@ -89,6 +89,10 @@ jobs:
           cache-dependency-path: |
             pnpm-lock.yaml
             mobile/pnpm-lock.yaml
+      - name: Set up Bun for CI typechecking
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.3
       - name: Install dependencies
         shell: bash
         run: |
@@ -108,7 +112,7 @@ jobs:
           node config/scripts/build-windows-process-tree-addon.mjs --arch=x64
           node config/scripts/build-windows-process-tree-addon.mjs --arch=arm64
       - name: Typecheck
-        run: pnpm tc
+        run: pnpm run typecheck:ci --bun-concurrency=2 --bun-threads=2
       - name: Build
         run: pnpm build:release
       - name: Package
