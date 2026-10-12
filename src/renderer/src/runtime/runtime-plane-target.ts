@@ -1,9 +1,8 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import {
-  getTaskSourceRuntimeSettings,
-  type TaskSourceContext
-} from '../../../shared/task-source-context'
-import { getActiveRuntimeTarget } from './runtime-rpc-client'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import { defaultScopeHost } from '@/lib/default-creation-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 
 export type RuntimePlaneSettings =
   | Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
@@ -17,10 +16,8 @@ function isTaskSourceRuntimeSettings(
   return settings !== null && settings !== undefined && 'kind' in settings
 }
 
-export function getPlaneRuntimeTarget(
-  settings: RuntimePlaneSettings
-): ReturnType<typeof getActiveRuntimeTarget> {
-  return getActiveRuntimeTarget(
-    isTaskSourceRuntimeSettings(settings) ? getTaskSourceRuntimeSettings(settings) : settings
-  )
+export function getPlaneRuntimeTarget(settings: RuntimePlaneSettings): RuntimeClientTarget {
+  return isTaskSourceRuntimeSettings(settings)
+    ? taskSourceRuntimeTarget(settings)
+    : defaultScopeHost(settings)
 }

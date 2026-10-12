@@ -26,7 +26,7 @@ import {
   agentSessionThrownFailure,
   type AgentSessionWriteFailure
 } from '../../../shared/agent-session-write-failure'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 /** The options a launch starts with, replaced whole so readers can compare by identity. */
 export type StructuredLaunchSelection = {
@@ -142,6 +142,17 @@ function settleHeldOption(
     replies.delete(id)
   }
   notifyStructuredLaunchListeners()
+  state.callers.onSettled()
+}
+
+/** Selections included in the durable create are already the host's option intent. */
+export function settleStructuredLaunchCreateOptions(
+  state: StructuredLaunchState,
+  options: Readonly<Record<string, string>>
+): void {
+  for (const [id, encoded] of Object.entries(options)) {
+    settleHeldOption(state, id, encoded, { kind: 'accepted', options })
+  }
 }
 
 /**

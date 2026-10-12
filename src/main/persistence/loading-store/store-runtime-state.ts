@@ -48,6 +48,8 @@ export class StoreRuntimeState {
   automationListProjectionCache: AutomationListProjectionCache | null = null
   activeViewPreference!: ActiveViewPreference
   readonly terminalScrollbackSnapshotStorage: TerminalScrollbackSnapshotStorage
+  /** Scrollback refs each in-flight migration export still reads, keyed by migration id. */
+  readonly retainedScrollbackRefsByMigrationId = new Map<string, ReadonlySet<string>>()
   writeTimer: ReturnType<typeof setTimeout> | null = null
   pendingWrite: Promise<void> | null = null
   pendingSnapshotFileWork: Promise<void> | null = null
@@ -85,6 +87,8 @@ export class StoreRuntimeState {
     ) => void
   >()
   uiChangeListeners = new Set<(ui: PersistedState['ui']) => void>()
+  /** Observers of persisted workspace-session writes; see notifyWorkspaceSessionWritten. */
+  readonly workspaceSessionWriteListeners = new Set<() => void>()
   projectHostOperations: ProjectHostPersistenceOperations | null = null
   projectGroupOperations: ProjectGroupPersistenceOperations | null = null
   folderWorkspaceOperations: FolderWorkspacePersistenceOperations | null = null

@@ -8,18 +8,7 @@ import { createRuntimeRpcAbortError } from './abortable-runtime-environment-call
 import { callRuntimeEnvironmentWithRevision } from './runtime-rpc-environment-call'
 import { unwrapRuntimeRpcResult } from './runtime-rpc-result'
 import { captureRuntimeEnvironmentRequestRevision } from './runtime-environment-revision'
-import type { RuntimeClientTarget } from './runtime-client-target'
-
-export {
-  getActiveRuntimeTarget,
-  settingsForRuntimeOwner,
-  type RuntimeClientTarget
-} from './runtime-client-target'
-export {
-  hasRuntimeRpcErrorCode,
-  RuntimeRpcCallError,
-  unwrapRuntimeRpcResult
-} from './runtime-rpc-result'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 const RUNTIME_COMPATIBILITY_CACHE_MAX = 32
 const RECENT_RUNTIME_COMPATIBILITY_FAILURE_TTL_MS = 60_000
@@ -105,8 +94,7 @@ export async function ensureRuntimeEnvironmentCompatible(
 ): Promise<void> {
   const cached = getCachedRuntimeCompatibilityCheck(environmentId, options)
   if (cached) {
-    await cached.check
-    return
+    return cached.check
   }
   const entry: RuntimeCompatibilityCacheEntry = {
     check: Promise.resolve(),
@@ -116,9 +104,10 @@ export async function ensureRuntimeEnvironmentCompatible(
     statusCheckedAt: null
   }
   const check = (async () => {
-    const response = await window.api.runtimeEnvironments.call({
-      selector: environmentId,
+    const response = await callRuntimeEnvironmentWithRevision({
+      environmentId,
       method: 'status.get',
+      params: undefined,
       timeoutMs: options.timeoutMs,
       expectedEnvironmentPairingRevision: options.expectedEnvironmentPairingRevision
     })

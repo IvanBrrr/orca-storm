@@ -5,6 +5,7 @@ import { RuntimeBrowserScreencastController } from './runtime-browser-screencast
 import { createRuntimeBrowserCommands } from './runtime-browser-commands-factory'
 import { RuntimeJiraCommands } from './runtime-jira-commands'
 import { RuntimePlaneCommands } from './runtime-plane-commands'
+import type { RpcBinarySender } from './rpc/rpc-binary-sender'
 
 type PublicMethods<T> = Pick<T, keyof T>
 type BrowserSurface = Omit<PublicMethods<RuntimeBrowserCommands>, 'browserScreencast'> & {
@@ -14,7 +15,7 @@ type BrowserSurface = Omit<PublicMethods<RuntimeBrowserCommands>, 'browserScreen
       connectionId?: string
       pairedDeviceId?: string
       clientKind?: 'mobile' | 'runtime'
-      sendBinary?: (bytes: Uint8Array<ArrayBufferLike>) => boolean | void
+      sendBinary?: RpcBinarySender
       signal?: AbortSignal
       emit: (result: BrowserScreencastResult) => void
     }

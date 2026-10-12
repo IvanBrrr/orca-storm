@@ -1,19 +1,35 @@
 import { useId } from 'react'
-import { Loader2 } from 'lucide-react'
 import type { CommentMarkdownLinkClickHandler } from '@/components/sidebar/CommentMarkdown'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { translate } from '@/i18n/i18n'
 import type { NativeChatLiveLine } from '../../../../shared/native-chat-live-line'
 import { nativeChatReasoningDisclosureKey } from '../../../../shared/native-chat-reasoning-row'
-import { describeNativeChatActiveTurnLabel } from '../../../../shared/native-chat-turn-status'
+import {
+  describeNativeChatActiveTurnLabel,
+  type NativeChatActiveTurnLabel
+} from '../../../../shared/native-chat-turn-status'
 import {
   NativeChatReasoningBody,
   NativeChatReasoningChevron
 } from './NativeChatReasoningDisclosure'
 import { useNativeChatDisclosure } from './native-chat-disclosure-store'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+
+// Literal keys with literal fallbacks: a dynamic key registers no catalog reference.
+function statusLabel(key: Extract<NativeChatActiveTurnLabel, { source: 'status' }>['key']): string {
+  switch (key) {
+    case 'thinking':
+      return translate('components.native-chat.status.thinking', 'Thinking')
+    case 'stopping':
+      return translate('components.native-chat.status.stopping', 'Stopping…')
+    case 'working':
+      return translate('components.native-chat.status.working', 'Working…')
+  }
+}
 
 /** The live turn's tail line: a spinner plus what the turn is doing right now —
- *  the provider's activity text, else that it is reasoning, else plain "Working…".
+ *  "Stopping…" once the person's Stop is ending it, else the provider's activity text, else that
+ *  it is reasoning, else plain "Working…".
  *  The clock lives in the turn bar under the user's message, not here. While the
  *  agent's open reasoning block has text, the line is that block's disclosure. */
 export function NativeChatTurnActivityLine({
@@ -26,12 +42,7 @@ export function NativeChatTurnActivityLine({
   allowFileUriLinks?: boolean
 }): React.JSX.Element {
   const resolved = describeNativeChatActiveTurnLabel(line)
-  const label =
-    resolved.source === 'activity'
-      ? resolved.text
-      : resolved.key === 'thinking'
-        ? translate('components.native-chat.status.thinking', 'Thinking')
-        : translate('components.native-chat.status.working', 'Working…')
+  const label = resolved.source === 'activity' ? resolved.text : statusLabel(resolved.key)
   const { reasoning } = line
   // The finished row reads this key too, so a block opened here lands open once it ends.
   const disclosure = useNativeChatDisclosure(
@@ -46,14 +57,14 @@ export function NativeChatTurnActivityLine({
       {/* One element for every state of the line, so a screen reader hears each new label. The
           trigger overlays it, rather than wrapping it, and the body sits outside it. */}
       <div
-        className="group/reasoning relative flex min-h-6 items-center gap-1.5 text-sm native-chat-message-text leading-relaxed text-muted-foreground"
+        className="group/reasoning relative flex min-h-6 items-center gap-1.5 text-sm leading-relaxed text-chat-foreground-faint"
         data-native-chat-turn-activity="true"
         data-state={open ? 'open' : 'closed'}
         aria-live="polite"
         aria-atomic="true"
       >
-        <Loader2 aria-hidden className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
-        <span id={labelId} className="min-w-0 truncate text-foreground/85">
+        <LoadingSpinner className="size-4 shrink-0" />
+        <span id={labelId} className="min-w-0 truncate text-chat-foreground">
           {label}
         </span>
         {reasoning ? (
@@ -63,7 +74,7 @@ export function NativeChatTurnActivityLine({
               <button
                 type="button"
                 aria-labelledby={labelId}
-                className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+                className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               />
             </CollapsibleTrigger>
           </>
@@ -75,6 +86,7 @@ export function NativeChatTurnActivityLine({
             markdown={reasoning.markdown}
             onLinkClick={onLinkClick}
             allowFileUriLinks={allowFileUriLinks}
+            streaming
           />
         </CollapsibleContent>
       ) : null}

@@ -18,8 +18,6 @@ export type ComposerDerivedModel = {
   setupConfig: SetupConfig | null
   setupPolicy: SetupRunPolicy
   linkedWorkItemProvider: TaskProvider | null
-  willApplyIssueCommandAsPrompt: boolean
-  shouldWaitForIssueAutomationCheck: boolean
   requiresExplicitSetupChoice: boolean
   resolvedSetupDecision: 'skip' | 'run' | null
   isSetupCheckPending: boolean
