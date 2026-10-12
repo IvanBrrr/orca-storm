@@ -105,14 +105,12 @@ jobs:
         if: matrix.target == 'win'
         shell: bash
         run: |
-          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=x64
-          node config/scripts/build-windows-process-tree-relay-addon.mjs --arch=arm64
+          node config/scripts/build-windows-process-tree-addon.mjs --arch=x64
+          node config/scripts/build-windows-process-tree-addon.mjs --arch=arm64
       - name: Typecheck
         run: pnpm tc
       - name: Build
         run: pnpm build:release
-        env:
-          ORCA_REQUIRE_RELAY_NATIVE_ADDONS: ${{ matrix.target == 'win' && 'x64,arm64' || '' }}
       - name: Package
         shell: bash
         run: |
