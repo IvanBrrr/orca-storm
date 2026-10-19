@@ -9,7 +9,7 @@ import {
   telegramTestMessage
 } from './telegram-test-fixture'
 
-it('fences approval buttons by the prompt revision and refuses answers already given in Orca', async () => {
+it('fences approval buttons by the prompt revision and refuses answers already given in Storca', async () => {
   const h = await telegramTestFixture()
   await h.ctx.topic(h.sessions[0]!)
   const item = telegramTestItem({

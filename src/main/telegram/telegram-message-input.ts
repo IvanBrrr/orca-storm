@@ -1,7 +1,17 @@
-import type { TelegramUserMessage } from './telegram-session-port'
+import type { TelegramSession, TelegramUserMessage } from './telegram-session-port'
 import type { TelegramMessage } from './telegram-bot-schema'
 import { TELEGRAM_MAX_DOWNLOAD_BYTES } from './telegram-bot-client'
 import type { TelegramSessionContext } from './telegram-session-context'
+
+export function telegramSendReceiptText(
+  session: TelegramSession | undefined,
+  queued: boolean
+): string {
+  if (session?.source === 'terminal' && queued) {
+    return 'Ввод принят терминалом. Начало хода пока не подтверждено.'
+  }
+  return queued ? 'Сообщение в очереди.' : 'Сообщение принято Storca.'
+}
 
 export async function telegramMessageBody(
   ctx: TelegramSessionContext,

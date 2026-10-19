@@ -8,6 +8,15 @@ import type {
   TelegramAction
 } from './telegram-integration-state'
 
+function telegramTopicName(session: TelegramSession): string {
+  const workspace = Array.from(session.workspaceName?.trim() ?? '')
+    .slice(0, 64)
+    .join('')
+  const conversation = session.name.trim() || `Новая сессия ${session.agent}`
+  const name = workspace ? `${workspace} · ${conversation}` : conversation
+  return Array.from(name).slice(0, 128).join('')
+}
+
 export class TelegramSessionContext {
   readonly sessions = new Map<string, TelegramSession>()
   readonly requested = new Set<string>()
@@ -125,7 +134,7 @@ export class TelegramSessionContext {
   async topic(session: TelegramSession): Promise<TelegramTopic> {
     const existing = this.state.data.topics[session.id]
     if (existing) {
-      const name = `${session.agent} · ${session.name}`.slice(0, 128)
+      const name = telegramTopicName(session)
       const owner = this.state.data.ownerId
       if (owner && session.visible && existing.name !== name) {
         try {
@@ -159,7 +168,7 @@ export class TelegramSessionContext {
     if (!owner) {
       throw new Error('Telegram ещё не привязан к владельцу.')
     }
-    const name = `${session.agent} · ${session.name}`.slice(0, 128)
+    const name = telegramTopicName(session)
     const history = session.agent === 'codex' ? await this.port.history(session.id) : []
     const result = await this.client.topic(owner, name, this.signal)
     const topic: TelegramTopic = {
@@ -195,7 +204,7 @@ export class TelegramSessionContext {
     await this.state.save()
     await this.text(
       topic.threadId,
-      `Сессия Orca: ${session.name}\nАгент: ${session.agent}\n${session.agent === 'codex' ? 'Пиши сюда, чтобы продолжить разговор.' : 'Переписка через Telegram пока поддерживается для Codex.'} /new создаёт новую сессию.`,
+      `Сессия Storca: ${name}\nАгент: ${session.agent}\n${session.agent === 'codex' ? 'Пиши сюда, чтобы продолжить разговор.' : 'Переписка через Telegram пока поддерживается для Codex.'}${session.source === 'terminal' ? '\nЗапросы разрешений в терминальных сессиях пока нужно подтверждать в Storca.' : ''} /new создаёт новую сессию.`,
       keyboard
     )
     return topic

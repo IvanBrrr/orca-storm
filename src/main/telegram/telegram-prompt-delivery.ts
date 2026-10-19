@@ -35,7 +35,7 @@ export async function deliverTelegramPrompt(
   if (isNewerApprovalSubject(body.subject)) {
     await ctx.text(
       topic.threadId,
-      `${body.title}\n\nЭтот тип запроса нужно открыть в Orca.\n${body.detail ?? ''}`
+      `${body.title}\n\nЭтот тип запроса нужно открыть в Storca.\n${body.detail ?? ''}`
     )
     return
   }
@@ -81,7 +81,7 @@ export async function deliverTelegramQuestion(
     item.body.kind !== 'question' ||
     item.body.resolution.state !== 'pending'
   ) {
-    throw new Error('Этот вопрос уже изменился или на него ответили в Orca.')
+    throw new Error('Этот вопрос уже изменился или на него ответили в Storca.')
   }
   const questions = agentSessionPromptQuestions(item.body)
   const question = questions[action.index]
@@ -194,7 +194,7 @@ export async function answerTelegramQuestionText(
     item.revision !== action.revision ||
     item.body.resolution.state !== 'pending'
   ) {
-    throw new Error('Этот вопрос уже изменился или на него ответили в Orca.')
+    throw new Error('Этот вопрос уже изменился или на него ответили в Storca.')
   }
   const questions = agentSessionPromptQuestions(item.body)
   const question = questions[action.index]

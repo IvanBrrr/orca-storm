@@ -61,7 +61,7 @@ export class TelegramIntegrationService {
       const webhook = await client.call('getWebhookInfo', {}, z.object({ url: z.string() }))
       if (webhook.url) {
         throw new Error(
-          'Этот бот использует webhook. Для Orca создай отдельного бота или отключи webhook.'
+          'Этот бот использует webhook. Для Storca создай отдельного бота или отключи webhook.'
         )
       }
       await this.stop()
@@ -122,7 +122,7 @@ export class TelegramIntegrationService {
       .catch(() => {})
       .then(() => {
         if (this.closed) {
-          throw new Error('Orca завершает работу.')
+          throw new Error('Storca завершает работу.')
         }
         return work()
       })

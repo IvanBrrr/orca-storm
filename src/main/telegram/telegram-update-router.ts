@@ -9,8 +9,13 @@ import type { TelegramMessage, TelegramUpdate } from './telegram-bot-schema'
 import type { TelegramSessionContext } from './telegram-session-context'
 import { hashTelegramPairingNonce } from './telegram-integration-state'
 import { answerTelegramQuestionText } from './telegram-prompt-delivery'
-import { confirmTelegramDraft, telegramMessageBody } from './telegram-message-input'
+import {
+  confirmTelegramDraft,
+  telegramMessageBody,
+  telegramSendReceiptText
+} from './telegram-message-input'
 import { TelegramApiError } from './telegram-bot-client'
+import { answerTelegramWorktreeName } from './telegram-worktree-creation'
 
 export async function routeTelegramUpdate(
   ctx: TelegramSessionContext,
@@ -50,7 +55,7 @@ async function routeTelegramUpdateExclusive(
       await ctx.state.save()
       await ctx.text(
         undefined,
-        'Telegram подключён к Orca. Темы сессий появятся автоматически. /new создаёт новую сессию, /sessions обновляет список.'
+        'Telegram подключён к Storca. Темы сессий появятся автоматически. /new создаёт новую сессию, /sessions обновляет список.'
       )
       return
     }
@@ -109,6 +114,9 @@ async function routeOwnerMessage(
 ): Promise<void> {
   const threadId = message.message_thread_id
   const command = message.text?.split(/\s/)[0]?.split('@')[0]
+  if (await answerTelegramWorktreeName(ctx, message)) {
+    return
+  }
   if (command === '/new') {
     await showTelegramWorkspaces(ctx, threadId)
     return
@@ -121,7 +129,7 @@ async function routeOwnerMessage(
     }
     await ctx.text(
       threadId,
-      `Сессий Orca: ${sessions.length}. Каждая находится в своей теме.\n/new — новая сессия\n/status — состояние сессии\n/stop — остановить текущую работу`
+      `Сессий Storca: ${sessions.length}. Каждая находится в своей теме.\n/new — новая сессия\n/status — состояние сессии\n/stop — остановить текущую работу`
     )
     return
   }
@@ -138,7 +146,7 @@ async function routeOwnerMessage(
   requireActiveSession(ctx, session.id)
   if (command === '/stop') {
     await ctx.port.stop(session.id, await ctx.operation(updateId))
-    await ctx.text(threadId, 'Запрос остановки передан в Orca.')
+    await ctx.text(threadId, 'Запрос остановки передан в Storca.')
     return
   }
   if (command?.startsWith('/')) {
@@ -200,7 +208,7 @@ async function routeOwnerMessage(
         inputKey,
         confirmation === 'voice'
           ? 'Распознано из голосового:'
-          : 'Сообщение получено, пока Orca была выключена. Передать агенту?'
+          : 'Сообщение получено, пока Storca была выключена. Передать агенту?'
       )
     }
     return
@@ -209,5 +217,5 @@ async function routeOwnerMessage(
   const queued = await ctx.port.send(session.id, await ctx.operation(updateId), body)
   input.used = true
   await ctx.state.save()
-  await ctx.text(threadId, queued ? 'Сообщение в очереди.' : 'Сообщение принято Orca.')
+  await ctx.text(threadId, telegramSendReceiptText(session, queued))
 }

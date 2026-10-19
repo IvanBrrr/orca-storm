@@ -36,7 +36,7 @@ export function TelegramIntegrationCard(): React.JSX.Element {
       name="Telegram"
       description={translate(
         'telegram.description',
-        'Continue Orca sessions from your personal bot. Each session has its own topic.'
+        'Continue Storca sessions from your personal bot. Each session has its own topic.'
       )}
       statusLabel={statusLabel}
       statusTone={status?.connected && status.ownerId ? 'connected' : 'neutral'}
@@ -46,7 +46,7 @@ export function TelegramIntegrationCard(): React.JSX.Element {
         <p className="text-xs text-muted-foreground">
           {translate(
             'telegram.setupHelp',
-            'Create a bot in BotFather and enable Threaded Mode. Keep Orca running to exchange messages, files, and voice notes.'
+            'Create a bot in BotFather and enable Threaded Mode. Keep Storca running to exchange messages, files, and voice notes.'
           )}
         </p>
         <Button
@@ -148,7 +148,7 @@ export function TelegramIntegrationCard(): React.JSX.Element {
             <p className="text-xs text-muted-foreground">
               {translate(
                 'telegram.voiceHelp',
-                'Voice notes use the speech model selected in Orca voice settings. Confirm the transcription before sending.'
+                'Voice notes use the speech model selected in Storca voice settings. Confirm the transcription before sending.'
               )}
             </p>
             {status.ownerId ? (

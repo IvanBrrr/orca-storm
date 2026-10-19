@@ -13,6 +13,9 @@ const PromptAnswer = z.object({
   other: z.string().optional()
 })
 export const TelegramAction = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('new-worktree'), page: z.number().int().nonnegative().default(0) }),
+  z.object({ kind: z.literal('worktree-repo'), repoId: z.string() }),
+  z.object({ kind: z.literal('worktree-name'), repoId: z.string(), name: z.string().optional() }),
   z.object({ kind: z.literal('workspaces'), page: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('create'), workspace: z.string() }),
   z.object({ kind: z.literal('stop'), sessionId: z.string(), turnId: z.string().optional() }),

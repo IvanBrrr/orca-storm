@@ -1,6 +1,8 @@
 import type { TelegramSessionContext } from './telegram-session-context'
 import type { TelegramAction } from './telegram-integration-state'
 import { deliverTelegramQuestion, answerTelegramQuestionText } from './telegram-prompt-delivery'
+import { telegramSendReceiptText } from './telegram-message-input'
+import { routeTelegramWorktreeAction } from './telegram-worktree-creation'
 
 export async function routeOwnerAction(
   ctx: TelegramSessionContext,
@@ -11,6 +13,9 @@ export async function routeOwnerAction(
   messageId?: number
 ): Promise<void> {
   await ctx.refresh()
+  if (await routeTelegramWorktreeAction(ctx, action, threadId)) {
+    return
+  }
   if (action.kind === 'discard') {
     const target = action.target ? ctx.state.data.actions[action.target] : undefined
     if (target?.used) {
@@ -36,7 +41,7 @@ export async function routeOwnerAction(
     await ctx.refresh()
     const session = ctx.sessions.get(sessionId)
     if (!session) {
-      throw new Error('Сессия создана, но пока не появилась в списке Orca. Используй /sessions.')
+      throw new Error('Сессия создана, но пока не появилась в списке Storca. Используй /sessions.')
     }
     const topic = await ctx.topic(session)
     await ctx.text(topic.threadId, 'Новая сессия готова. Отправь первую задачу.')
@@ -46,10 +51,13 @@ export async function routeOwnerAction(
     await showTelegramStatus(ctx, action.sessionId, threadId)
     return
   }
+  if (!('sessionId' in action)) {
+    throw new Error('Ответь названием на сообщение бота или используй /new.')
+  }
   requireActiveSession(ctx, action.sessionId)
   if (action.kind === 'stop') {
     await ctx.port.stop(action.sessionId, await ctx.operation(`stop:${updateId}`), action.turnId)
-    await ctx.text(threadId, 'Запрос остановки передан в Orca.')
+    await ctx.text(threadId, 'Запрос остановки передан в Storca.')
   } else if (action.kind === 'draft') {
     ctx.request(action.sessionId)
     if (action.replyToQuestion) {
@@ -76,7 +84,7 @@ export async function routeOwnerAction(
       await ctx.operation(`draft:${key}`),
       action.body
     )
-    await ctx.text(threadId, queued ? 'Сообщение в очереди.' : 'Сообщение принято Orca.')
+    await ctx.text(threadId, telegramSendReceiptText(ctx.sessions.get(action.sessionId), queued))
   } else if (action.kind === 'prompt') {
     const prompt = await ctx.port.prompt(action.sessionId, action.itemId)
     if (
@@ -85,7 +93,7 @@ export async function routeOwnerAction(
       (prompt.body.kind !== 'approval' && prompt.body.kind !== 'question') ||
       prompt.body.resolution.state !== 'pending'
     ) {
-      throw new Error('Этот вопрос уже изменился или на него ответили в Orca.')
+      throw new Error('Этот вопрос уже изменился или на него ответили в Storca.')
     }
     await ctx.port.respond(action.sessionId, await ctx.operation(`prompt:${key}`), {
       kind: action.promptKind,
@@ -103,7 +111,7 @@ export async function routeOwnerAction(
 export function requireActiveSession(ctx: TelegramSessionContext, sessionId: string): void {
   const session = ctx.sessions.get(sessionId)
   if (!session?.visible) {
-    throw new Error('Сессия закрыта. Открой её в Orca или создай новую через /new.')
+    throw new Error('Сессия закрыта. Открой её в Storca или создай новую через /new.')
   }
   if (session.agent !== 'codex') {
     throw new Error('В этой версии Telegram поддерживает переписку только с Codex.')
@@ -140,15 +148,13 @@ export async function showTelegramWorkspaces(
   page = 0
 ): Promise<void> {
   const workspaces = await ctx.port.workspaces()
-  if (!workspaces.length) {
-    await ctx.text(threadId, 'Сначала добавь проект или папку в Orca.')
-    return
-  }
-  const rows = workspaces
+  const sorted = [...workspaces].sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0))
+  const rows = sorted
     .slice(page * 8, (page + 1) * 8)
     .map((workspace) => [
       ctx.button(workspace.name, { kind: 'create', workspace: workspace.id }, threadId)
     ])
+  rows.unshift([ctx.button('Новый ворктрии', { kind: 'new-worktree', page: 0 }, threadId)])
   if (page > 0) {
     rows.push([ctx.button('Назад', { kind: 'workspaces', page: page - 1 }, threadId)])
   }

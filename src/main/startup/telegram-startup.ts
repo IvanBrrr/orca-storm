@@ -27,7 +27,7 @@ export function startTelegramIntegration(runtime: OrcaRuntimeService): void {
   ready = integration.initialize()
   const trusted = async (event: Electron.IpcMainInvokeEvent) => {
     if (!isTrustedUIRenderer(event.sender) || event.senderFrame !== event.sender.mainFrame) {
-      throw new Error('Telegram доступен только из настроек Orca.')
+      throw new Error('Telegram доступен только из настроек Storca.')
     }
     await ready
     return integration

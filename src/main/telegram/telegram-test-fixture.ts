@@ -89,6 +89,8 @@ export async function telegramTestFixture() {
   const port: TelegramSessionPort = {
     list: async () => sessions,
     workspaces: async () => [{ id: 'workspace-1', name: 'Project' }],
+    repositories: async () => [{ id: 'repo-1', name: 'Project' }],
+    createWorkspace: async () => 'workspace-1',
     create,
     send,
     stop,

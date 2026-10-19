@@ -198,3 +198,19 @@ it('keeps Telegram delivery enabled while another message is queued', async () =
   expect(h.sent.some((entry) => entry.params.text === 'Second result')).toBe(true)
   expect(h.ctx.requested.has('session-1')).toBe(false)
 })
+
+it('names topics after the workspace and conversation and renames the existing topic', async () => {
+  const h = await telegramTestFixture()
+  const session = h.sessions[0]!
+  session.workspaceName = 'ВПН ФЕЙЛ КЛОСЕД'
+  session.name = 'Проработать концепцию VPN'
+  await h.ctx.refresh()
+  const topic = await h.ctx.topic(session)
+  expect(topic.name).toBe('ВПН ФЕЙЛ КЛОСЕД · Проработать концепцию VPN')
+  const thread = topic.threadId
+  session.workspaceName = 'VPN'
+  session.name = 'Новая тема беседы'
+  await h.ctx.topic(session)
+  expect(topic.threadId).toBe(thread)
+  expect(topic.name).toBe('VPN · Новая тема беседы')
+})

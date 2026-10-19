@@ -8,14 +8,16 @@ export type TelegramUserMessage = z.infer<typeof SendBodyStructure>
 
 export type TelegramSession = {
   id: string
+  source?: 'terminal'
   workspaceId: string
+  workspaceName?: string
   name: string
   agent: string
   visible: boolean
   updatedAt: number
   status: AgentSessionStatusSummary | null
 }
-export type TelegramWorkspace = { id: string; name: string }
+export type TelegramWorkspace = { id: string; name: string; activityAt?: number }
 export type TelegramPromptResponse = {
   itemId: string
   expectedRevision: number
@@ -26,6 +28,8 @@ export type TelegramPromptResponse = {
 export type TelegramSessionPort = {
   list(): Promise<TelegramSession[]>
   workspaces(): Promise<TelegramWorkspace[]>
+  repositories(): Promise<TelegramWorkspace[]>
+  createWorkspace(repoId: string, name: string, operationId: string): Promise<string>
   create(workspace: string, operationId: string): Promise<string>
   history(sessionId: string): Promise<AgentJournalRenderItem[]>
   pendingPrompts(sessionId: string): Promise<AgentJournalRenderItem[]>

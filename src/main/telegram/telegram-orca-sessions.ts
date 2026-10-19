@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { deriveGeneratedTabTitle } from '../../shared/agent-tab-title'
+import { formatAgentTypeLabel } from '../../shared/agent-type-label'
 import { computeAgentSessionPayloadFingerprint } from '../../shared/agent-session-mutation-envelope'
 import type {
   AgentSessionMutationEnvelope,
@@ -19,50 +21,72 @@ import type {
   TelegramSessionPort,
   TelegramWorkspace
 } from './telegram-session-port'
+import { TelegramTerminalSessions } from './telegram-terminal-sessions'
+import { TelegramWorkspaceNames } from './telegram-workspace-names'
+import { TelegramWorkspaces } from './telegram-workspaces'
 
 const caller = { callerKey: 'telegram:owner' }
 
 export class TelegramOrcaSessions implements TelegramSessionPort {
+  private readonly terminals: TelegramTerminalSessions
+  private readonly workspaceNames: TelegramWorkspaceNames
+  private readonly workspaceCatalog: TelegramWorkspaces
   constructor(
     private readonly runtime: OrcaRuntimeService,
     readonly transcribe: TelegramSessionPort['transcribe']
-  ) {}
+  ) {
+    this.terminals = new TelegramTerminalSessions(runtime)
+    this.workspaceNames = new TelegramWorkspaceNames(runtime)
+    this.workspaceCatalog = new TelegramWorkspaces(runtime)
+  }
 
   private async host() {
     await this.runtime.ensureStructuredAgentSessionHost()
     const host = getStructuredAgentSessionHost()
     if (!host) {
-      throw new Error('Сессии Orca пока недоступны.')
+      throw new Error('Сессии Storca пока недоступны.')
     }
     return host
   }
   async list() {
+    await this.workspaceNames.refresh()
     const host = await this.host()
     await this.runtime.prepareStructuredAgentSessionStartupRestoration()
     const visible = new Set(host.deps.store.listVisibleSessionIds())
-    return host.deps.store.listRecords().map((record) => {
+    const chats = host.deps.store.listRecords().map((record) => {
       const status = host.readStatusSummary(record.sessionId)
       return {
         id: record.sessionId,
         workspaceId: record.location.workspaceId,
-        name: record.conversationName ?? status?.latestPrompt?.slice(0, 80) ?? record.sessionId,
+        workspaceName: this.workspaceNames.get(record.location.workspaceId),
+        name:
+          record.conversationName?.trim() ||
+          deriveGeneratedTabTitle(status?.latestPrompt ?? '') ||
+          `Новая сессия ${formatAgentTypeLabel(record.provider)}`,
         agent: record.provider,
         visible: visible.has(record.sessionId),
         updatedAt: status?.updatedAt ?? record.updatedAt,
         status: status ?? null
       }
     })
+    return [
+      ...chats,
+      ...(await this.terminals.list()).map((session) => ({
+        ...session,
+        workspaceName: this.workspaceNames.get(session.workspaceId)
+      }))
+    ]
   }
   async workspaces(): Promise<TelegramWorkspace[]> {
-    const listing = await this.runtime.listManagedWorktrees(undefined, 500)
-    const folders = this.runtime.listFolderWorkspaces()
-    return [
-      ...listing.worktrees.map((workspace) => ({
-        id: workspace.id,
-        name: workspace.displayName || workspace.branch || workspace.path
-      })),
-      ...folders.map((workspace) => ({ id: workspace.id, name: workspace.name }))
-    ]
+    return this.workspaceCatalog.list()
+  }
+  async repositories(): Promise<TelegramWorkspace[]> {
+    return this.workspaceCatalog.repositories()
+  }
+  async createWorkspace(repoId: string, name: string, operationId: string): Promise<string> {
+    const id = await this.workspaceCatalog.create(repoId, name, operationId)
+    this.workspaceNames.invalidate()
+    return id
   }
   private async envelope(
     sessionId: string,
@@ -72,7 +96,7 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
   ): Promise<AgentSessionMutationEnvelope> {
     const record = (await this.host()).deps.store.getRecord(sessionId)
     if (!record) {
-      throw new Error('Сессия не найдена в Orca.')
+      throw new Error('Сессия не найдена в Storca.')
     }
     if (record.provider !== 'codex') {
       throw new Error('В этой версии Telegram поддерживает переписку только с Codex.')
@@ -115,15 +139,24 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     return sessionId
   }
   async history(sessionId: string) {
+    if (sessionId.startsWith('terminal:')) {
+      return this.terminals.history(sessionId)
+    }
     const result = await (await this.host()).history({ sessionId, direction: 'tail', limit: 200 })
     return result.page.items
   }
   async prompt(sessionId: string, itemId: string) {
+    if (sessionId.startsWith('terminal:')) {
+      return undefined
+    }
     return (await (await this.host()).journalSnapshot(sessionId)).items.find(
       (item) => item.itemId === itemId
     )
   }
   async pendingPrompts(sessionId: string) {
+    if (sessionId.startsWith('terminal:')) {
+      return []
+    }
     const snapshot = await (await this.host()).journalSnapshot(sessionId)
     return snapshot.items.filter(
       (item) =>
@@ -132,6 +165,9 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     )
   }
   async hasPendingMessages(sessionId: string): Promise<boolean> {
+    if (sessionId.startsWith('terminal:')) {
+      return false
+    }
     const { page } = await (await this.host()).history({ sessionId, direction: 'tail', limit: 40 })
     return Boolean(
       page.queuedMessages?.length ||
@@ -139,6 +175,9 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     )
   }
   async send(sessionId: string, operationId: string, body: TelegramUserMessage): Promise<boolean> {
+    if (sessionId.startsWith('terminal:')) {
+      return this.terminals.send(sessionId, operationId, body)
+    }
     const fields = { body, delivery: 'queue-if-active' }
     const envelope = await this.envelope(sessionId, operationId, 'agentSession.send', fields)
     const result = await (
@@ -148,6 +187,9 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     return 'queued' in value
   }
   async stop(sessionId: string, operationId: string, turnId?: string): Promise<void> {
+    if (sessionId.startsWith('terminal:')) {
+      return this.terminals.stop(sessionId, operationId)
+    }
     const fields = turnId ? { turnId } : {}
     const envelope = await this.envelope(sessionId, operationId, 'agentSession.cancel', fields)
     unwrapTelegramSessionMutation(await (await this.host()).cancel(caller, { envelope, ...fields }))
@@ -169,6 +211,9 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     )
   }
   async upload(sessionId: string, name: string, bytes: Buffer): Promise<string> {
+    if (sessionId.startsWith('terminal:')) {
+      return this.terminals.upload(sessionId, name, bytes)
+    }
     const host = await this.host()
     const record = host.deps.store.getRecord(sessionId)
     if (
@@ -205,6 +250,9 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     }
   }
   async outputFiles(sessionId: string, items: Parameters<TelegramSessionPort['outputFiles']>[1]) {
+    if (sessionId.startsWith('terminal:')) {
+      return this.terminals.outputFiles(sessionId, items)
+    }
     const record = (await this.host()).deps.store.getRecord(sessionId)
     if (
       !record ||

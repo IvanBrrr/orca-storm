@@ -14,7 +14,7 @@ export class TelegramApiError extends Error {
   ) {
     super(
       code === 409
-        ? 'Этот бот уже подключён к другой Orca или использует webhook.'
+        ? 'Этот бот уже подключён к другой Storca или использует webhook.'
         : code === 401
           ? 'Токен Telegram-бота недействителен.'
           : code === 429

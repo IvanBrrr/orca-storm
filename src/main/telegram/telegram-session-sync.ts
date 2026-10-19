@@ -34,7 +34,7 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
             await ctx.state.save()
             await ctx.text(
               topic.threadId,
-              'Сессия закрыта в Orca. История сохранена, уведомления прекращены.'
+              'Сессия закрыта в Storca. История сохранена, уведомления прекращены.'
             )
           }
         }
@@ -96,13 +96,13 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
             if (deliver && (outcome !== 'success' || !deliveredMessage)) {
               const text =
                 outcome === 'failure'
-                  ? 'Агент сообщил об ошибке. Подробности доступны в сессии Orca.'
+                  ? 'Агент сообщил об ошибке. Подробности доступны в сессии Storca.'
                   : outcome === 'cancellation'
                     ? 'Работа остановлена.'
                     : outcome === 'interruption'
-                      ? 'Выполнение прервалось. Проверь сессию в Orca.'
+                      ? 'Выполнение прервалось. Проверь сессию в Storca.'
                       : outcome === 'unconfirmed'
-                        ? 'Результат хода не подтверждён. Проверь связь с хостом в Orca.'
+                        ? 'Результат хода не подтверждён. Проверь связь с хостом в Storca.'
                         : outcome === 'superseded'
                           ? 'Предыдущий ход заменён новой задачей.'
                           : 'Ход завершён.'

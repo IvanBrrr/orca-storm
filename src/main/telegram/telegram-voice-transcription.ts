@@ -26,7 +26,7 @@ export async function transcribeTelegramVoice(
     return result.text
   } catch {
     throw new Error(
-      'Не удалось распознать голосовое. Проверь модель в настройках голоса Orca и дождись завершения другой диктовки.'
+      'Не удалось распознать голосовое. Проверь модель в настройках голоса Storca и дождись завершения другой диктовки.'
     )
   } finally {
     if (started) {

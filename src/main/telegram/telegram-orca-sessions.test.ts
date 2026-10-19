@@ -73,6 +73,18 @@ it('creates a visible chat at rest with host defaults and can send its first tas
       }
     }
   )
+  vi.spyOn(runtime, 'prepareStructuredAgentSessionStartupRestoration').mockResolvedValue()
+  vi.spyOn(runtime, 'listManagedWorktrees').mockResolvedValue({
+    worktrees: [],
+    totalCount: 0,
+    truncated: false
+  })
+  vi.spyOn(runtime, 'listFolderWorkspaces').mockReturnValue([])
+  vi.spyOn(runtime, 'listTerminals').mockResolvedValue({
+    terminals: [],
+    totalCount: 0,
+    truncated: false
+  })
   const publish = vi
     .spyOn(runtime, 'publishStructuredAgentSessionTab')
     .mockImplementation(async (args) => {
@@ -87,10 +99,57 @@ it('creates a visible chat at rest with host defaults and can send its first tas
   expect(current.store.getRecord(id)?.options?.model).toBe('host-default')
   expect(publish).toHaveBeenCalledWith(expect.objectContaining({ sessionId: id, activate: false }))
   expect(current.adapter.acquire).not.toHaveBeenCalled()
+  expect((await sessions.list())[0]?.name).toBe('Новая сессия Codex')
   await sessions.send(id, hostTestOperationId(), {
     kind: 'message',
     role: 'user',
     blocks: [{ type: 'text', text: 'First task' }]
   })
   await vi.waitFor(() => expect(current.adapter.dispatch).toHaveBeenCalledTimes(1))
+})
+
+it('lists existing terminal sessions alongside native chats when the native store is empty', async () => {
+  rig = await createRestTestRig({ idleSweep: { intervalMs: 60_000 } })
+  setStructuredAgentSessionHost(rig.host)
+  const runtime = new OrcaRuntimeService()
+  vi.spyOn(runtime, 'ensureStructuredAgentSessionHost').mockResolvedValue()
+  vi.spyOn(runtime, 'prepareStructuredAgentSessionStartupRestoration').mockResolvedValue()
+  vi.spyOn(runtime, 'listManagedWorktrees').mockResolvedValue({
+    worktrees: [],
+    totalCount: 0,
+    truncated: false
+  })
+  vi.spyOn(runtime, 'listFolderWorkspaces').mockReturnValue([])
+  vi.spyOn(runtime, 'listTerminals').mockResolvedValue({
+    terminals: [
+      {
+        handle: 'term-codex',
+        ptyId: 'pty-codex',
+        worktreeId: 'repo::/work/ВПН ФЕЙЛ КЛОСЕД',
+        worktreePath: '/work/ВПН ФЕЙЛ КЛОСЕД',
+        branch: 'feature',
+        tabId: 'tab-codex',
+        leafId: 'leaf-codex',
+        title: 'Проработать концепцию VPN',
+        connected: true,
+        writable: true,
+        lastOutputAt: null,
+        preview: '',
+        agentIdentity: 'codex',
+        executionHostId: 'local'
+      }
+    ],
+    totalCount: 1,
+    truncated: false
+  })
+  const sessions = new TelegramOrcaSessions(runtime, async () => '')
+  const listed = await sessions.list()
+  expect(listed).toHaveLength(1)
+  expect(listed[0]).toMatchObject({
+    source: 'terminal',
+    agent: 'codex',
+    visible: true,
+    name: 'Проработать концепцию VPN',
+    workspaceName: 'ВПН ФЕЙЛ КЛОСЕД'
+  })
 })
