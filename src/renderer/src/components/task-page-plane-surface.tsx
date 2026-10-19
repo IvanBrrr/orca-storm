@@ -390,15 +390,13 @@ function PlaneWorkspaceWorkItems({
                 size="sm"
                 variant="outline"
                 disabled={loading}
-                onClick={() =>
-                  setLimit((current) => {
-                    const next = Math.min(current + 250, MAX_LOADED_ITEMS)
-                    if (projectId) {
-                      savePlaneWorkItemLimit(workspaceId, projectId, next)
-                    }
-                    return next
-                  })
-                }
+                onClick={() => {
+                  const next = Math.min(limit + 250, MAX_LOADED_ITEMS)
+                  setLimit(next)
+                  if (projectId) {
+                    savePlaneWorkItemLimit(workspaceId, projectId, next)
+                  }
+                }}
               >
                 {loading
                   ? translate('auto.components.TaskPagePlaneSurface.loadingMore', 'Loading…')
