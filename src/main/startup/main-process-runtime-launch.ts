@@ -37,6 +37,7 @@ import { registerCliForHeadlessServe } from './serve-cli-registration'
 import { scheduleAllPendingHistoryTreeRemovals } from '../terminal-history-deletion'
 import { triggerStartupNotificationRegistration } from '../ipc/startup-notification-registration'
 import { startDesktopPushService } from './main-process-push-startup'
+import { startTelegramIntegration } from './telegram-startup'
 import { mainProcessState as state } from './main-process-state'
 import { logStartupMilestone } from './startup-diagnostics'
 import { setupHeadlessServeAutoUpdater } from '../window/main-window-updater'
@@ -234,6 +235,9 @@ async function launchDesktopMode(
   // Why after the proxy await: the push gateway client is an app-owned fetcher, so it must not
   // issue its first request ahead of the persisted proxy.
   startDesktopPushService(runtimeRpc)
+  if (state.runtime) {
+    startTelegramIntegration(state.runtime)
+  }
   // Why: macOS notification permission dialog must fire after the window is shown, else it's hidden behind the maximized window.
   win.once('show', () => {
     // Why: store can be null if init failed earlier; bail rather than throw inside an Electron event listener.

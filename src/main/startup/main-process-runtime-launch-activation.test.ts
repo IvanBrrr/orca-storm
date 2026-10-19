@@ -53,6 +53,7 @@ vi.mock('./main-process-relay-status', () => ({
   publishDesktopRelayStatus: vi.fn()
 }))
 vi.mock('./main-process-relay-startup', () => ({ startDesktopRelayService: vi.fn() }))
+vi.mock('./telegram-startup', () => ({ startTelegramIntegration: vi.fn() }))
 vi.mock('./main-process-serve', () => ({
   getServeOptions: vi.fn(() => null),
   getBundledWebClientRoot: vi.fn(() => null),

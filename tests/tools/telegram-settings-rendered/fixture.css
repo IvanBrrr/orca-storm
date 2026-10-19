@@ -1,0 +1,5 @@
+@import '../../../src/renderer/src/assets/main.css';
+@source './fixture.tsx';
+@source '../../../src/renderer/src/components/settings/TelegramIntegrationCard.tsx';
+@source '../../../src/renderer/src/components/settings/integration-card-shell.tsx';
+@source '../../../src/renderer/src/components/ui';

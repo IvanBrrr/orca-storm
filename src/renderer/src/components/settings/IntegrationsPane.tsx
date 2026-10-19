@@ -9,6 +9,8 @@ import { JiraIntegrationCard, LinearIntegrationCard } from './task-tracker-integ
 import { PlaneIntegrationCard } from './plane-integration-card'
 import { useIntegrationProviderStatusRefresh } from './use-integration-provider-status-refresh'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import { TelegramIntegrationCard } from './TelegramIntegrationCard'
 export { getIntegrationsPaneSearchEntries } from './integrations-search'
 
 export function IntegrationsPane(): React.JSX.Element {
@@ -16,6 +18,7 @@ export function IntegrationsPane(): React.JSX.Element {
 
   return (
     <div className="space-y-5">
+      {!isWebClientLocation() ? <TelegramIntegrationCard /> : null}
       <section className="space-y-3">
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-foreground">

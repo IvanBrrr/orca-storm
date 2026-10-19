@@ -25,6 +25,7 @@ import { ghApi } from './api/gh-bridge'
 import { hostedReviewApi } from './api/hosted-review-bridge'
 import { glApiBridge } from './api/gl-bridge'
 import { bitbucketApi } from './api/bitbucket-bridge'
+import { telegramApi } from './api/telegram-bridge'
 import { linearApi } from './api/linear-bridge'
 import { jiraApi } from './api/jira-bridge'
 import { planeApi } from './api/plane-bridge'
@@ -122,6 +123,7 @@ const api = {
   hostedReview: hostedReviewApi,
   gl: glApiBridge,
   bitbucket: bitbucketApi,
+  telegram: telegramApi,
   linear: linearApi,
   jira: jiraApi,
   plane: planeApi,

@@ -4,6 +4,14 @@ import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 
 export const getIntegrationsPaneSearchEntries = createLocalizedCatalog(() => [
   {
+    title: 'Telegram',
+    description: translate(
+      'telegram.description',
+      'Continue Orca sessions from your personal bot. Each session has its own topic.'
+    ),
+    keywords: ['telegram', 'bot', 'телеграм', 'бот', 'topics', 'notifications', 'voice']
+  },
+  {
     title: translate(
       'auto.components.settings.integrations.search.f16e41cc72',
       'GitHub Integration'

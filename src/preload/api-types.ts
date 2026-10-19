@@ -1,3 +1,4 @@
+import type { TelegramIntegrationApi } from '../shared/telegram-integration'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -93,6 +94,7 @@ export type PreloadApi = {
   hostedReview: HostedReviewApi
   gl: GitLabApi
   bitbucket: BitbucketApi
+  telegram: TelegramIntegrationApi
   linear: LinearApi
   jira: JiraApi
   plane: PlaneApi

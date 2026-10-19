@@ -19951,5 +19951,28 @@
     "browser": "Browser",
     "editor": "Editor",
     "terminal": "Terminal"
+  },
+  "telegram": {
+    "loading": "Loading…",
+    "connected": "Connected",
+    "setupRequired": "Setup required",
+    "notConnected": "Not connected",
+    "description": "Continue Orca sessions from your personal bot. Each session has its own topic.",
+    "setupHelp": "Create a bot in BotFather and enable Threaded Mode. Keep Orca running to exchange messages, files, and voice notes.",
+    "botFather": "Open BotFather",
+    "token": "Bot token",
+    "tokenSaved": "Token saved",
+    "botId": "Telegram bot ID",
+    "checkBot": "Save and check bot",
+    "connectBot": "Connect bot",
+    "relink": "Link another Telegram account",
+    "link": "Link my Telegram account",
+    "disconnect": "Disconnect bot",
+    "notifications": "Notify me when I am away",
+    "awayHelp": "Notifications start when the computer is locked or inactive for 3 minutes. Replies to Telegram messages are always delivered.",
+    "voiceHelp": "Voice notes use the speech model selected in Orca voice settings. Confirm the transcription before sending.",
+    "ownerSummary": "Telegram account: {{ownerId}} · Session topics: {{topicCount}}",
+    "unavailable": "Telegram settings are unavailable. Try reopening settings.",
+    "failed": "Telegram request failed."
   }
 }

@@ -9,6 +9,7 @@ import { agentHookServer } from '../agent-hooks/server'
 import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
 import { removeManagedAgentHooksAsync } from '../agent-hooks/managed-agent-hook-controls'
 import { stopStructuredAgentSessionRuntime } from '../runtime/structured-agent-session-runtime'
+import { stopTelegramIntegration } from './telegram-startup'
 import { setStructuredAgentSessionTeardownTrigger } from '../runtime/structured-agent-session-runtime-teardown'
 import { awaitRuntimeFileWatcherUnsubscribes } from '../runtime/orca-runtime-files'
 import { clearRuntimeMetadataIfOwned } from '../runtime/runtime-metadata'
@@ -143,6 +144,7 @@ function installWillQuitHandler(): void {
     // Why before the stop: teardown stamps each working session's resume marker with why the app
     // went away, and an update install is a restart the user never chose.
     setStructuredAgentSessionTeardownTrigger(updateQuitInProgress ? 'update' : 'quit')
+    const telegramShutdown = stopTelegramIntegration()
     const structuredAgentSessionShutdown = stopStructuredAgentSessionRuntime()
     state.pluginService = null
     setUnreadDockBadgeCount(0)
@@ -278,6 +280,7 @@ function installWillQuitHandler(): void {
       { name: 'ref-maintenance', promise: refMaintenanceShutdown },
       { name: 'codex-backfill-recovery', promise: codexBackfillRecoveryShutdown },
       { name: 'structured-agent-session', promise: structuredAgentSessionShutdown },
+      { name: 'telegram', promise: telegramShutdown },
       { name: 'usage-cache', promise: usageCacheFlush },
       { name: 'notification-dismissals', promise: notificationDismissalClose },
       { name: 'stats', promise: statsFlush },
