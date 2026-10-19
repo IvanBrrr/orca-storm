@@ -66,17 +66,13 @@ function writeUnreadableReceipt(id: string, method: string): void {
     .run(id, SESSION, CALLER.callerKey, method)
 }
 
-/** What a rewind does to the conversation: a new epoch rebuilt with none of the old rows. */
+/** Simulates an older host retiring the whole epoch, including its unsent submissions. */
 async function rewindConversation(): Promise<void> {
   const journal = rig.host.collaboratorsForTests().sessions.get(SESSION)?.journal
   if (!journal) {
     throw new Error('expected an open conversation')
   }
-  await journal.replaceEpochItems(
-    'handle_forked',
-    rig.store.getRecord(SESSION)!.lease.runtimeFence,
-    []
-  )
+  await journal.rollEpoch('handle_forked', rig.store.getRecord(SESSION)!.lease.runtimeFence)
 }
 
 /** A stop that leaves a waiting card paused, which only a Resume lifts. */
@@ -518,7 +514,7 @@ describe.each([
 describe('an id reused across commands', () => {
   const conflict = CONFLICT
 
-  it('refuses a Stop reusing a Delete id, through the compatibility ledger row', async () => {
+  it('refuses a Stop reusing a Delete id', async () => {
     await rig.workingSend()
     const draftId = await queuedDraft('delete then stop')
     const id = opId()
@@ -534,7 +530,11 @@ describe('an id reused across commands', () => {
     expect(await rig.deleteQueued(draftId, id)).toMatchObject(conflict)
     expect(await rig.resume(id)).toMatchObject(conflict)
     expect(await rig.queuePause()).toEqual({ reason: 'stopped' })
-    expect(receipt(id)).toEqual({ verdict: 'absent' })
+    // Only the Stop's own receipt: neither refused action committed anything over it.
+    expect(receipt(id)).toMatchObject({
+      verdict: 'readable',
+      receipt: { method: 'agentSession.cancel', result: { kind: 'journal-row' } }
+    })
   })
 
   it('refuses a Send now reusing a Delete id, and the reverse', async () => {

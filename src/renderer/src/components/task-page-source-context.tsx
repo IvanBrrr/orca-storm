@@ -5,6 +5,7 @@ import type { JiraIssue } from '../../../shared/jira-types'
 import type { PlaneWorkItem } from '../../../shared/plane-types'
 import type { Repo } from '../../../shared/repo-types'
 import { getLinkedWorkItemWorkspaceName, getLinkedWorkItemSuggestedName } from '@/lib/new-workspace'
+import { getJiraIssueKeyCasingSeedOptions } from '@/lib/jira-issue-key-casing'
 import {
   type TaskSourceContext,
   normalizeTaskSourceContext,
@@ -59,13 +60,16 @@ export function getGitLabWorkItemWorkspaceSeed(item: GitLabWorkItem): string {
 }
 export function getJiraIssueWorkspaceSeed(issue: JiraIssue): string {
   return (
-    getLinkedWorkItemWorkspaceName({
-      type: 'issue',
-      provider: 'jira',
-      number: 0,
-      title: `${issue.key} ${issue.title}`,
-      jiraIdentifier: issue.key
-    })?.seedName ?? getLinkedWorkItemSuggestedName(issue)
+    getLinkedWorkItemWorkspaceName(
+      {
+        type: 'issue',
+        provider: 'jira',
+        number: 0,
+        title: `${issue.key} ${issue.title}`,
+        jiraIdentifier: issue.key
+      },
+      getJiraIssueKeyCasingSeedOptions()
+    )?.seedName ?? getLinkedWorkItemSuggestedName(issue)
   )
 }
 export function getPlaneWorkItemWorkspaceSeed(item: PlaneWorkItem): string {

@@ -18,6 +18,8 @@ import {
   getJiraIssueWorkspaceSeed,
   getPlaneWorkItemWorkspaceSeed
 } from './task-page-source-context'
+import { findJiraIssueDefaultRepo } from '../../../shared/jira-project-reference'
+import { getRepoWorkspaceCreationTargetHint } from '@/lib/project-host-workspace-target'
 export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) {
   const {
     setTaskResumeState,
@@ -219,14 +221,19 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
         url: issue.url,
         jiraIdentifier: issue.key
       }
+      const mappedRepo = findJiraIssueDefaultRepo(model.repos, issue, taskSourceContext.hostId)
       openModal('new-workspace-composer', {
         linkedWorkItem,
         taskSourceContext,
+        initialRepoId: mappedRepo?.id,
+        initialWorkspaceTarget: mappedRepo
+          ? getRepoWorkspaceCreationTargetHint(mappedRepo, useAppStore.getState().projectHostSetups)
+          : undefined,
         prefilledName: getJiraIssueWorkspaceSeed(issue),
         telemetrySource: 'sidebar'
       })
     },
-    [jiraSites, jiraTaskSourceContext, openModal]
+    [jiraSites, jiraTaskSourceContext, model.repos, openModal]
   )
   const handleUseJiraItem = useCallback(
     (issue: JiraIssue): void => {

@@ -17,6 +17,7 @@ export type RepoOption = ReturnType<typeof useAppStore.getState>['repos'][number
 
 export type SmartWorkspaceNameFieldProps = {
   repos: readonly RepoOption[]
+  selectedRepo?: RepoOption | null
   repoId: string
   onRepoChange: (repoId: string) => void
   value: string
@@ -94,6 +95,7 @@ export const RESULT_LIMIT = 12
 export type WorkItemSourceSearchProps = Pick<
   SmartWorkspaceNameFieldProps,
   | 'repos'
+  | 'selectedRepo'
   | 'repoId'
   | 'value'
   | 'disabled'
