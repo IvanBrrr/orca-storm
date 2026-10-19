@@ -6,6 +6,7 @@ import { getSecretStore } from '../../shared/secret-store'
 import { SendBodyStructure } from '../../shared/rpc-contract/structured-agent-session-message-params'
 import { AtomicSnapshotWriter } from '../persistence/atomic-snapshot-writer'
 import { createStructuredAgentSessionOperationId } from '../../shared/structured-agent-session-mutation'
+import { TelegramMessage } from './telegram-bot-schema'
 
 const PromptAnswer = z.object({
   questionId: z.string(),
@@ -13,11 +14,59 @@ const PromptAnswer = z.object({
   other: z.string().optional()
 })
 export const TelegramAction = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('new-worktree'), page: z.number().int().nonnegative().default(0) }),
-  z.object({ kind: z.literal('worktree-repo'), repoId: z.string() }),
-  z.object({ kind: z.literal('worktree-name'), repoId: z.string(), name: z.string().optional() }),
-  z.object({ kind: z.literal('workspaces'), page: z.number().int().nonnegative() }),
-  z.object({ kind: z.literal('create'), workspace: z.string() }),
+  z.object({
+    kind: z.literal('sessions'),
+    page: z.number().int().nonnegative(),
+    query: z.string().optional(),
+    draftKey: z.string().optional()
+  }),
+  z.object({ kind: z.literal('session-search'), draftKey: z.string().optional() }),
+  z.object({
+    kind: z.literal('session-query'),
+    draftKey: z.string().optional(),
+    answerUpdateId: z.number().int().optional()
+  }),
+  z.object({
+    kind: z.literal('session-select'),
+    sessionId: z.string(),
+    page: z.number().int().nonnegative(),
+    query: z.string().optional(),
+    draftKey: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('session-open'),
+    sessionId: z.string(),
+    draftKey: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('route-draft'),
+    message: TelegramMessage,
+    updateId: z.number().int(),
+    targetSessionId: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('new-worktree'),
+    page: z.number().int().nonnegative().default(0),
+    draftKey: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('worktree-repo'),
+    repoId: z.string(),
+    draftKey: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('worktree-name'),
+    repoId: z.string(),
+    name: z.string().optional(),
+    answerUpdateId: z.number().int().optional(),
+    draftKey: z.string().optional()
+  }),
+  z.object({
+    kind: z.literal('workspaces'),
+    page: z.number().int().nonnegative(),
+    draftKey: z.string().optional()
+  }),
+  z.object({ kind: z.literal('create'), workspace: z.string(), draftKey: z.string().optional() }),
   z.object({ kind: z.literal('stop'), sessionId: z.string(), turnId: z.string().optional() }),
   z.object({ kind: z.literal('status'), sessionId: z.string() }),
   z.object({
@@ -25,7 +74,8 @@ export const TelegramAction = z.discriminatedUnion('kind', [
     sessionId: z.string(),
     body: SendBodyStructure,
     replyToQuestion: z.string().optional(),
-    confirmation: z.enum(['none', 'voice', 'offline']).optional()
+    confirmation: z.enum(['none', 'voice', 'offline']).optional(),
+    operationId: z.string().optional()
   }),
   z.object({ kind: z.literal('discard'), target: z.string().optional() }),
   z.object({
@@ -55,6 +105,19 @@ const Topic = z.object({
   name: z.string(),
   closed: z.boolean().default(false),
   seen: z.array(z.string()).default([]),
+  historyDelivered: z.boolean().optional(),
+  progress: z
+    .object({
+      key: z.string(),
+      messageId: z.number().int().positive(),
+      threadId: z.number().int().positive(),
+      head: z.string(),
+      text: z.string(),
+      updatedAt: z.number(),
+      settled: z.boolean().optional(),
+      pendingStart: z.boolean().optional()
+    })
+    .optional(),
   lastUpdated: z.number().default(0)
 })
 const State = z.object({

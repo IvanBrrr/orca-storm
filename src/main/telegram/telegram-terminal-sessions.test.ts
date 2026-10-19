@@ -9,6 +9,8 @@ import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
 import { TelegramTerminalSessions } from './telegram-terminal-sessions'
 import { telegramTerminalSessionId } from './telegram-terminal-projection'
 import { createAgentPromptSubmissionRuntime } from '../runtime/agent-prompt-submission-runtime-test-fixture'
+import { RpcDispatcher } from '../runtime/rpc/dispatcher'
+import { TERMINAL_SEND_METHODS } from '../runtime/rpc/methods/terminal/terminal-send-method'
 
 vi.mock('../git/worktree', () => ({
   listWorktrees: vi.fn().mockResolvedValue([
@@ -213,6 +215,7 @@ it('does not send task text into a terminal approval prompt', async () => {
     () => undefined,
     'codex'
   )
+  vi.spyOn(runtime, 'getDriver').mockReturnValue({ kind: 'mobile', clientId: 'phone-one' })
   vi.spyOn(runtime, 'getTerminalAgentStatus').mockResolvedValue({
     handle,
     isRunningAgent: true,
@@ -229,4 +232,55 @@ it('does not send task text into a terminal approval prompt', async () => {
     })
   ).rejects.toThrow('terminal_guard_permission')
   expect(writes).toHaveLength(before)
+})
+
+it('accepts the owner Telegram prompt while a phone owns the viewport without taking its input floor', async () => {
+  vi.useFakeTimers()
+  const { runtime, handle, writes } = await createAgentPromptSubmissionRuntime(
+    () => undefined,
+    'codex'
+  )
+  db = new OrchestrationDb(':memory:')
+  vi.spyOn(runtime, 'getOrchestrationDb').mockReturnValue(db)
+  const driver = vi
+    .spyOn(runtime, 'getDriver')
+    .mockReturnValue({ kind: 'mobile', clientId: 'phone-one' })
+  const floor = vi.spyOn(runtime, 'beginMobileInputFloor')
+  vi.spyOn(runtime, 'getTerminalAgentStatus').mockResolvedValue({
+    handle,
+    isRunningAgent: true,
+    status: 'idle'
+  })
+  const untrusted = await new RpcDispatcher({ runtime, methods: TERMINAL_SEND_METHODS }).dispatch({
+    id: 'untrusted-ui-input',
+    authToken: '',
+    method: 'terminal.send',
+    params: {
+      terminal: handle,
+      text: 'Must remain blocked',
+      enter: true,
+      agentPrompt: true,
+      client: { id: 'telegram:owner', type: 'desktop' },
+      terminalInputOrigin: 'owner-automation'
+    }
+  })
+  expect(untrusted).toMatchObject({
+    ok: true,
+    result: { send: { accepted: false, bytesWritten: 0 } }
+  })
+  expect(writes.join('')).not.toContain('Must remain blocked')
+  const port = new TelegramTerminalSessions(runtime)
+  const [session] = await port.list()
+  const sent = expect(
+    port.send(session!.id, 'telegram-phone-open', {
+      kind: 'message',
+      role: 'user',
+      blocks: [{ type: 'text', text: 'Continue from Telegram' }]
+    })
+  ).resolves.toBeTypeOf('boolean')
+  await vi.runAllTimersAsync()
+  await sent
+  expect(writes.join('')).toContain('Continue from Telegram')
+  expect(floor).not.toHaveBeenCalled()
+  expect(driver).toHaveReturnedWith({ kind: 'mobile', clientId: 'phone-one' })
 })

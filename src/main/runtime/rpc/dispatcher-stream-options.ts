@@ -8,6 +8,7 @@ import type { RpcCallerScope } from './rpc-caller-scope'
 export type RpcDispatchStreamingOptions = Pick<
   RpcContext,
   | 'authenticatedCallerFingerprint'
+  | 'terminalInputOrigin'
   | 'connectionId'
   | 'signal'
   | 'clientId'
@@ -57,6 +58,7 @@ export function rpcContextFromTransport(
     clientCapabilities: options?.clientCapabilities,
     updateClientCapabilities: options?.updateClientCapabilities,
     authenticatedCallerFingerprint: options?.authenticatedCallerFingerprint,
+    terminalInputOrigin: options?.terminalInputOrigin,
     pairing: options?.pairing,
     deviceSelf: options?.deviceSelf,
     mobileRelayHosts: options?.mobileRelayHosts,

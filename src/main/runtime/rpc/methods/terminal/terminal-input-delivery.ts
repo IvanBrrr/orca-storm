@@ -1,4 +1,4 @@
-import { InvalidArgumentError } from '../../core'
+import { InvalidArgumentError, type RpcContext } from '../../core'
 import type { RuntimeTerminalSend } from '../../../../../shared/runtime-terminal-send-contract'
 import type { DriverState, OrcaRuntimeService } from '../../../orca-runtime'
 import {
@@ -7,13 +7,15 @@ import {
   isTerminalInputTooLargeWithYield
 } from '../../../../../shared/terminal-input'
 import type { TerminalViewportClient } from './terminal-stream-types'
+import { assertTerminalAgentSendable } from '../../terminal-agent-send-guard'
 
 export function isTerminalInputLockedForClient(
   runtime: OrcaRuntimeService,
   ptyId: string,
-  client: TerminalViewportClient | undefined
+  client: TerminalViewportClient | undefined,
+  origin?: RpcContext['terminalInputOrigin']
 ): boolean {
-  if (client?.type === 'mobile') {
+  if (client?.type === 'mobile' || origin === 'owner-automation') {
     return false
   }
   // Why: pre-refactor mobile builds sent no client metadata, so treat a missing client as legacy mobile (unlocked).
@@ -21,6 +23,25 @@ export function isTerminalInputLockedForClient(
     return false
   }
   return runtime.getDriver(ptyId).kind === 'mobile'
+}
+
+export async function assertTerminalSendAgentPreconditions(
+  runtime: OrcaRuntimeService,
+  handle: string,
+  ptyId: string | undefined,
+  client: TerminalViewportClient | undefined,
+  origin?: RpcContext['terminalInputOrigin']
+): Promise<void> {
+  await assertTerminalAgentSendable({
+    runtime,
+    handle,
+    assertWritable: () => {
+      assertTerminalSendExactPtyBinding(runtime, handle, ptyId)
+      if (ptyId && isTerminalInputLockedForClient(runtime, ptyId, client, origin)) {
+        throw new Error('terminal_guard_not_writable')
+      }
+    }
+  })
 }
 
 export async function assertTerminalSendTextWithinLimit(text: string | undefined): Promise<void> {

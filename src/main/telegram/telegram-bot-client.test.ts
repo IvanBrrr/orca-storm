@@ -74,3 +74,17 @@ it('splits long Unicode replies without breaking surrogate pairs or exceeding Te
   expect(parts.join('')).toBe(text)
   expect(parts.every((part) => part.length <= 3500 && !part.includes('\uFFFD'))).toBe(true)
 })
+
+it('sends every part of a silent receipt quietly while leaving ordinary replies unchanged', async () => {
+  const params: Record<string, unknown>[] = []
+  const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+    params.push(JSON.parse(String(init?.body)))
+    return Response.json({ ok: true, result: { message_id: 1 } })
+  })
+  const client = new TelegramBotClient('token', fetcher, 0)
+  await client.text(42, 101, 'Receipt '.repeat(1000), undefined, undefined, { silent: true })
+  expect(params.length).toBeGreaterThan(1)
+  expect(params.every((part) => part.disable_notification === true)).toBe(true)
+  await client.text(42, 101, 'Answer')
+  expect(params.at(-1)?.disable_notification).toBeUndefined()
+})

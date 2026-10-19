@@ -43,3 +43,6 @@ export type TelegramMessage = z.infer<typeof TelegramMessage>
 export type TelegramUpdate = z.infer<typeof TelegramUpdate>
 export type TelegramFile = z.infer<typeof TelegramFile>
 export type TelegramKeyboard = { inline_keyboard: { text: string; callback_data: string }[][] }
+export type TelegramReplyMarkup =
+  | TelegramKeyboard
+  | { force_reply: true; input_field_placeholder?: string }

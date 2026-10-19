@@ -15,6 +15,7 @@ export type TelegramSession = {
   agent: string
   visible: boolean
   updatedAt: number
+  turnStartedAt?: number
   status: AgentSessionStatusSummary | null
 }
 export type TelegramWorkspace = { id: string; name: string; activityAt?: number }
@@ -32,6 +33,8 @@ export type TelegramSessionPort = {
   createWorkspace(repoId: string, name: string, operationId: string): Promise<string>
   create(workspace: string, operationId: string): Promise<string>
   history(sessionId: string): Promise<AgentJournalRenderItem[]>
+  recentHistory?(sessionId: string, signal: AbortSignal): Promise<AgentJournalRenderItem[] | null>
+  progress?(sessionId: string): Promise<{ key: string; start: string; lines: string[] }>
   pendingPrompts(sessionId: string): Promise<AgentJournalRenderItem[]>
   hasPendingMessages(sessionId: string): Promise<boolean>
   prompt(sessionId: string, itemId: string): Promise<AgentJournalRenderItem | undefined>

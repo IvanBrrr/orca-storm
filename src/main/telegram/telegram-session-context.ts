@@ -1,4 +1,4 @@
-import type { TelegramKeyboard } from './telegram-bot-schema'
+import type { TelegramReplyMarkup, TelegramKeyboard } from './telegram-bot-schema'
 import type { TelegramBotClient } from './telegram-bot-client'
 import { TelegramApiError } from './telegram-bot-client'
 import type { TelegramSessionPort, TelegramSession } from './telegram-session-port'
@@ -8,7 +8,7 @@ import type {
   TelegramAction
 } from './telegram-integration-state'
 
-function telegramTopicName(session: TelegramSession): string {
+export function telegramTopicName(session: TelegramSession): string {
   const workspace = Array.from(session.workspaceName?.trim() ?? '')
     .slice(0, 64)
     .join('')
@@ -66,7 +66,8 @@ export class TelegramSessionContext {
   async text(
     threadId: number | undefined,
     text: string,
-    keyboard?: TelegramKeyboard
+    keyboard?: TelegramReplyMarkup,
+    options?: { silent?: boolean }
   ): Promise<number> {
     const owner = this.state.data.ownerId
     if (!owner) {
@@ -74,13 +75,13 @@ export class TelegramSessionContext {
     }
     this.signal.throwIfAborted()
     try {
-      return await this.client.text(owner, threadId, text, keyboard, this.signal)
+      return await this.client.text(owner, threadId, text, keyboard, this.signal, options)
     } catch (error) {
       if (!(error instanceof TelegramApiError) || !error.topicMissing || !threadId) {
         throw error
       }
       const replacement = await this.replaceDeletedTopic(threadId)
-      if (keyboard) {
+      if (keyboard && 'inline_keyboard' in keyboard) {
         for (const row of keyboard.inline_keyboard) {
           for (const button of row) {
             const action = this.state.data.actions[button.callback_data]
@@ -91,7 +92,7 @@ export class TelegramSessionContext {
         }
         await this.state.save()
       }
-      return this.client.text(owner, replacement, text, keyboard, this.signal)
+      return this.client.text(owner, replacement, text, keyboard, this.signal, options)
     }
   }
   async document(threadId: number, bytes: Uint8Array, name: string): Promise<void> {
@@ -114,6 +115,31 @@ export class TelegramSessionContext {
       )
     }
   }
+  async menu(
+    threadId: number | undefined,
+    messageId: number | undefined,
+    text: string,
+    keyboard: TelegramKeyboard
+  ): Promise<void> {
+    await this.state.save()
+    if (messageId && this.state.data.ownerId) {
+      try {
+        await this.client.editText(this.state.data.ownerId, messageId, text, keyboard, this.signal)
+        return
+      } catch (error) {
+        if (!(error instanceof TelegramApiError)) {
+          throw error
+        }
+        if (error.messageNotModified) {
+          return
+        }
+        if (!error.messageMissing && !error.topicMissing) {
+          throw error
+        }
+      }
+    }
+    await this.text(threadId, text, keyboard, { silent: true })
+  }
   private async replaceDeletedTopic(threadId: number): Promise<number> {
     const entry = Object.entries(this.state.data.topics).find(
       ([, topic]) => topic.threadId === threadId
@@ -129,7 +155,15 @@ export class TelegramSessionContext {
     return topic.threadId
   }
   button(text: string, action: TelegramAction, threadId?: number) {
-    return { text: text.slice(0, 100), callback_data: this.state.action(action, threadId) }
+    const identity = ['sessions', 'session-search', 'session-select', 'workspaces'].includes(
+      action.kind
+    )
+      ? `navigation:${threadId ?? 0}:${JSON.stringify(action)}`
+      : undefined
+    return {
+      text: Array.from(text).slice(0, 100).join(''),
+      callback_data: this.state.action(action, threadId, identity)
+    }
   }
   async topic(session: TelegramSession): Promise<TelegramTopic> {
     const existing = this.state.data.topics[session.id]
@@ -198,6 +232,10 @@ export class TelegramSessionContext {
         [
           this.button('Статус', { kind: 'status', sessionId: session.id }, topic.threadId),
           this.button('Остановить', { kind: 'stop', sessionId: session.id }, topic.threadId)
+        ],
+        [
+          this.button('Все сессии', { kind: 'sessions', page: 0 }, topic.threadId),
+          this.button('Новая сессия', { kind: 'workspaces', page: 0 }, topic.threadId)
         ]
       ]
     }
@@ -205,7 +243,8 @@ export class TelegramSessionContext {
     await this.text(
       topic.threadId,
       `Сессия Storca: ${name}\nАгент: ${session.agent}\n${session.agent === 'codex' ? 'Пиши сюда, чтобы продолжить разговор.' : 'Переписка через Telegram пока поддерживается для Codex.'}${session.source === 'terminal' ? '\nЗапросы разрешений в терминальных сессиях пока нужно подтверждать в Storca.' : ''} /new создаёт новую сессию.`,
-      keyboard
+      keyboard,
+      { silent: true }
     )
     return topic
   }

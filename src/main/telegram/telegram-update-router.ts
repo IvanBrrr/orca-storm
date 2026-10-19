@@ -8,14 +8,13 @@ import { timingSafeEqual } from 'node:crypto'
 import type { TelegramMessage, TelegramUpdate } from './telegram-bot-schema'
 import type { TelegramSessionContext } from './telegram-session-context'
 import { hashTelegramPairingNonce } from './telegram-integration-state'
-import { answerTelegramQuestionText } from './telegram-prompt-delivery'
-import {
-  confirmTelegramDraft,
-  telegramMessageBody,
-  telegramSendReceiptText
-} from './telegram-message-input'
 import { TelegramApiError } from './telegram-bot-client'
 import { answerTelegramWorktreeName } from './telegram-worktree-creation'
+import { sendTelegramSessionMessage } from './telegram-session-input'
+import { cancelTelegramTextPrompt } from './telegram-navigation-input'
+import { answerTelegramSessionSearch } from './telegram-session-navigation'
+import { showTelegramSessions } from './telegram-session-catalog'
+import { saveTelegramNavigationDraft } from './telegram-navigation-draft'
 
 export async function routeTelegramUpdate(
   ctx: TelegramSessionContext,
@@ -100,10 +99,14 @@ async function routeTelegramUpdateExclusive(
     update.update_id,
     callback.message.message_id
   )
-  stored.used =
-    stored.action.kind !== 'status' &&
-    stored.action.kind !== 'stop' &&
-    stored.action.kind !== 'workspaces'
+  stored.used = ![
+    'status',
+    'stop',
+    'workspaces',
+    'sessions',
+    'session-search',
+    'session-select'
+  ].includes(stored.action.kind)
   await ctx.state.save()
 }
 
@@ -114,29 +117,34 @@ async function routeOwnerMessage(
 ): Promise<void> {
   const threadId = message.message_thread_id
   const command = message.text?.split(/\s/)[0]?.split('@')[0]
-  if (await answerTelegramWorktreeName(ctx, message)) {
-    return
-  }
-  if (command === '/new') {
+  if (command === '/new' || command === '/cancel') {
+    cancelTelegramTextPrompt(ctx, threadId)
+    await ctx.state.save()
+    if (command === '/cancel') {
+      await showTelegramSessions(ctx, threadId)
+      return
+    }
     await showTelegramWorkspaces(ctx, threadId)
     return
   }
+  if (await answerTelegramSessionSearch(ctx, message, updateId)) {
+    return
+  }
+  if (await answerTelegramWorktreeName(ctx, message, updateId)) {
+    return
+  }
   if (command === '/start' || command === '/sessions' || command === '/help') {
-    await ctx.refresh()
-    const sessions = [...ctx.sessions.values()].filter((session) => session.visible)
-    for (const session of sessions) {
-      await ctx.topic(session)
-    }
-    await ctx.text(
-      threadId,
-      `Сессий Storca: ${sessions.length}. Каждая находится в своей теме.\n/new — новая сессия\n/status — состояние сессии\n/stop — остановить текущую работу`
-    )
+    cancelTelegramTextPrompt(ctx, threadId)
+    await showTelegramSessions(ctx, threadId)
     return
   }
   await ctx.refresh()
   const session = ctx.sessionForThread(threadId)
   if (!session || !threadId) {
-    await ctx.text(threadId, 'Выбери тему сессии или используй /new, чтобы создать новую.')
+    const draftKey = command?.startsWith('/')
+      ? undefined
+      : await saveTelegramNavigationDraft(ctx, message, updateId)
+    await showTelegramSessions(ctx, threadId, { draftKey })
     return
   }
   if (command === '/status') {
@@ -153,69 +161,5 @@ async function routeOwnerMessage(
     await ctx.text(threadId, 'Доступные команды: /new, /sessions, /status, /stop.')
     return
   }
-  const replyKey =
-    message.reply_to_message && ctx.state.data.replies[String(message.reply_to_message.message_id)]
-  const reply = replyKey ? ctx.state.data.actions[replyKey] : undefined
-  if (reply?.action.kind === 'question' && reply.threadId === threadId) {
-    if (reply.used || reply.expiresAt < Date.now()) {
-      throw new Error('Ответ на этот вопрос уже отправлен или устарел.')
-    }
-    if (message.text) {
-      await answerTelegramQuestionText(ctx, reply.action, message.text)
-      reply.used = true
-      await ctx.state.save()
-      return
-    }
-    if (!message.voice) {
-      throw new Error('Ответь на вопрос текстом или голосовым сообщением.')
-    }
-  }
-  const inputIdentity = ctx.identity(`input:${updateId}`)
-  const inputKey = hashTelegramPairingNonce(inputIdentity).slice(0, 24)
-  let input = ctx.state.data.actions[inputKey]
-  if (!input) {
-    const prepared = await telegramMessageBody(ctx, session.id, message)
-    const confirmation = prepared.confirm
-      ? 'voice'
-      : message.date * 1000 < ctx.pollingStartedAt - 1000
-        ? 'offline'
-        : 'none'
-    ctx.state.action(
-      {
-        kind: 'draft',
-        sessionId: session.id,
-        body: prepared.body,
-        confirmation,
-        ...(replyKey && reply?.action.kind === 'question' && reply.threadId === threadId
-          ? { replyToQuestion: replyKey }
-          : {})
-      },
-      threadId,
-      inputIdentity
-    )
-    await ctx.state.save()
-    input = ctx.state.data.actions[inputKey]
-  }
-  if (!input || input.action.kind !== 'draft') {
-    throw new Error('Не удалось сохранить сообщение.')
-  }
-  const { body, confirmation } = input.action
-  if (confirmation && confirmation !== 'none') {
-    if (!input.used) {
-      await confirmTelegramDraft(
-        ctx,
-        threadId,
-        inputKey,
-        confirmation === 'voice'
-          ? 'Распознано из голосового:'
-          : 'Сообщение получено, пока Storca была выключена. Передать агенту?'
-      )
-    }
-    return
-  }
-  ctx.request(session.id)
-  const queued = await ctx.port.send(session.id, await ctx.operation(updateId), body)
-  input.used = true
-  await ctx.state.save()
-  await ctx.text(threadId, telegramSendReceiptText(session, queued))
+  await sendTelegramSessionMessage(ctx, session, message, updateId)
 }

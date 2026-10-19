@@ -73,6 +73,7 @@ export function projectTelegramTerminal(
       agent: terminal.agentIdentity ?? 'unknown',
       visible: true,
       updatedAt,
+      turnStartedAt: row?.turnStartedAt ?? row?.stateStartedAt,
       status:
         terminal.agentIdentity === 'codex'
           ? {

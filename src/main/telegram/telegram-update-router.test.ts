@@ -71,7 +71,7 @@ it('routes replies to the topic session and gives retransmissions the same durab
   const update = { update_id: 12, message: telegramTestMessage() }
   await routeTelegramUpdate(h.ctx, update)
   await routeTelegramUpdate(h.ctx, update)
-  expect(h.send.mock.calls[0]?.[1]).toBe(h.send.mock.calls[1]?.[1])
+  expect(h.send).toHaveBeenCalledTimes(1)
   expect(parseAgentSessionOperationTimestamp(h.send.mock.calls[0]?.[1] ?? '')).not.toBeNull()
   expect(h.send).toHaveBeenCalledWith('session-1', expect.any(String), {
     kind: 'message',
@@ -79,6 +79,10 @@ it('routes replies to the topic session and gives retransmissions the same durab
     blocks: [{ type: 'text', text: 'Task' }]
   })
   expect(h.sent.some((entry) => entry.params.text === 'Сообщение в очереди.')).toBe(true)
+  expect(
+    h.sent.find((entry) => entry.params.text === 'Сообщение в очереди.')?.params
+      .disable_notification
+  ).toBe(true)
 })
 
 it('holds offline messages for confirmation and refuses cross-topic or repeated buttons', async () => {
@@ -101,6 +105,10 @@ it('holds offline messages for confirmation and refuses cross-topic or repeated 
   await routeTelegramUpdate(h.ctx, telegramTestCallback(draft[0], 101))
   await routeTelegramUpdate(h.ctx, telegramTestCallback(draft[0], 101))
   expect(h.send).toHaveBeenCalledTimes(1)
+  expect(
+    h.sent.find((entry) => entry.params.text === 'Сообщение принято Storca.')?.params
+      .disable_notification
+  ).toBe(true)
 })
 
 it('creates a session in a listed folder and materializes its topic once', async () => {

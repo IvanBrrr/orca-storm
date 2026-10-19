@@ -20,7 +20,7 @@ function setStatus(session: TelegramSession, status: 'idle' | 'working' | 'atten
   }
 }
 
-it('baselines history, notifies only when away, and does not resend old messages', async () => {
+it('previews history once, notifies only when away, and does not resend old messages', async () => {
   const h = await telegramTestFixture()
   const old = telegramTestItem({
     kind: 'message',
@@ -29,7 +29,9 @@ it('baselines history, notifies only when away, and does not resend old messages
   })
   h.setItems([old])
   await syncTelegramSessions(h.ctx)
-  expect(h.sent.some((entry) => entry.params.text === 'old')).toBe(false)
+  expect(
+    h.sent.filter((entry) => String(entry.params.text).includes('Из истории · Агент\n\nold'))
+  ).toHaveLength(1)
   const present = telegramTestItem(
     { kind: 'message', role: 'assistant', blocks: [{ type: 'text', text: 'present' }] },
     'present'

@@ -24,6 +24,7 @@ import type {
 import { TelegramTerminalSessions } from './telegram-terminal-sessions'
 import { TelegramWorkspaceNames } from './telegram-workspace-names'
 import { TelegramWorkspaces } from './telegram-workspaces'
+import { projectTelegramSessionProgress } from './telegram-session-progress'
 
 const caller = { callerKey: 'telegram:owner' }
 
@@ -144,6 +145,16 @@ export class TelegramOrcaSessions implements TelegramSessionPort {
     }
     const result = await (await this.host()).history({ sessionId, direction: 'tail', limit: 200 })
     return result.page.items
+  }
+  async recentHistory(sessionId: string, signal: AbortSignal) {
+    return sessionId.startsWith('terminal:')
+      ? this.terminals.recentHistory(sessionId, signal)
+      : this.history(sessionId)
+  }
+  async progress(sessionId: string) {
+    return sessionId.startsWith('terminal:')
+      ? this.terminals.progress(sessionId)
+      : projectTelegramSessionProgress(await this.history(sessionId))
   }
   async prompt(sessionId: string, itemId: string) {
     if (sessionId.startsWith('terminal:')) {

@@ -2,6 +2,8 @@ import type { AgentJournalRenderItem } from '../../shared/agent-session-journal-
 import type { TelegramSessionContext } from './telegram-session-context'
 import { deliverTelegramPrompt } from './telegram-prompt-delivery'
 import type { TelegramTopic } from './telegram-integration-state'
+import { deliverTelegramSessionHistory } from './telegram-session-history'
+import { syncTelegramSessionProgress } from './telegram-session-progress'
 
 function completedMessage(item: AgentJournalRenderItem): boolean {
   return (
@@ -44,6 +46,18 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
         if (session.agent !== 'codex') {
           return
         }
+        try {
+          await deliverTelegramSessionHistory(ctx, session, topic)
+        } catch (error) {
+          firstError ??= error
+        }
+        const deliver =
+          ctx.requested.has(sessionId) || (away && ctx.state.data.notificationsEnabled)
+        try {
+          await syncTelegramSessionProgress(ctx, session, topic, deliver)
+        } catch (error) {
+          firstError ??= error
+        }
         if (
           topic.lastUpdated === session.updatedAt &&
           !becameAway &&
@@ -61,8 +75,6 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
                   (item.body.kind === 'approval' || item.body.kind === 'question') &&
                   item.body.resolution.state === 'pending'
               )
-        const deliver =
-          ctx.requested.has(sessionId) || (away && ctx.state.data.notificationsEnabled)
         let deliveredMessage = false
         // Wait for a settled turn so partial provider prose is never frozen into a Telegram message.
         if (session.status?.status !== 'working') {
@@ -114,6 +126,7 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
         }
         if (
           session.status?.status === 'idle' &&
+          !topic.progress?.pendingStart &&
           (deliveredMessage || settledOutcome) &&
           !(await ctx.port.hasPendingMessages(sessionId))
         ) {

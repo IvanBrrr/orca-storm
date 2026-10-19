@@ -88,6 +88,8 @@ export type LegacyCoordinatorAuthorityProof = Readonly<{
 
 export type RpcContext = {
   runtime: OrcaRuntimeService
+  /** Host-attested owner automation; never read from request params or used to claim a UI viewport. */
+  terminalInputOrigin?: 'owner-automation'
   // Why: lets long-poll handlers release immediately on client disconnect instead of running down timeoutMs. See design doc §3.1.
   signal?: AbortSignal
   // Why: per-WebSocket key so the server reaps a closing socket's subscriptions without touching sibling sockets sharing the deviceToken.

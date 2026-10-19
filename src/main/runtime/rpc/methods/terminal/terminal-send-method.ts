@@ -2,10 +2,9 @@ import { assertLegacyAiVaultResumeCommandAllowed } from '../../../../ai-vault/st
 import { InvalidArgumentError, defineMethod } from '../../core'
 import { isTerminalQueryReply } from '../../../../../shared/terminal-query-reply'
 import { isUntypedTerminalInput } from '../../../../../shared/terminal-untyped-input'
-import { assertTerminalAgentSendable } from '../../terminal-agent-send-guard'
 import { TerminalSend } from '../../../../../shared/rpc-contract/terminal-unary-params'
 import {
-  assertTerminalSendExactPtyBinding,
+  assertTerminalSendAgentPreconditions,
   assertTerminalSendTextWithinLimit,
   commitMobileInputFloorClaim,
   getTerminalSendGuardRefusedReason,
@@ -30,6 +29,7 @@ export const TERMINAL_SEND_METHODS = [
       {
         runtime,
         clientId,
+        terminalInputOrigin: inputOrigin,
         signal,
         orchestrationMutation,
         recordMutationReceipt,
@@ -77,6 +77,8 @@ export const TERMINAL_SEND_METHODS = [
       // Why: a stale handle must fail with terminal_handle_stale, not evaluate driver/lock state against the wrong PTY (#7718).
       const leaf = runtime.resolveLiveLeafForHandle(params.terminal)
       const driver = leaf?.ptyId ? runtime.getDriver(leaf.ptyId) : null
+      const inputLocked = (ptyId: string) =>
+        isTerminalInputLockedForClient(runtime, ptyId, params.client, inputOrigin)
       if (
         params.inputKind === 'query-reply' &&
         leaf?.ptyId &&
@@ -90,7 +92,7 @@ export const TERMINAL_SEND_METHODS = [
           }
         }
       }
-      if (leaf?.ptyId && isTerminalInputLockedForClient(runtime, leaf.ptyId, params.client)) {
+      if (leaf?.ptyId && inputLocked(leaf.ptyId)) {
         return {
           send: {
             handle: params.terminal,
@@ -124,7 +126,7 @@ export const TERMINAL_SEND_METHODS = [
           true
         )
         // Why: a stream-less request can't safely create ownership, so never write at stale geometry.
-        if (!claim.updated || isTerminalInputLockedForClient(runtime, leaf.ptyId, params.client)) {
+        if (!claim.updated || inputLocked(leaf.ptyId)) {
           return {
             send: {
               handle: params.terminal,
@@ -147,22 +149,20 @@ export const TERMINAL_SEND_METHODS = [
         }
       }
       // Why: recheck permission/no-agent state immediately before accepting the PTY write.
-      const assertSendPreconditions =
-        params.requireAgentStatus === 'sendable'
-          ? async (ptyId?: string): Promise<void> => {
-              await assertTerminalAgentSendable({
-                runtime,
-                handle: params.terminal,
-                assertWritable: () => {
-                  assertTerminalSendExactPtyBinding(runtime, params.terminal, ptyId)
-                  if (ptyId && isTerminalInputLockedForClient(runtime, ptyId, params.client)) {
-                    throw new Error('terminal_guard_not_writable')
-                  }
-                }
-              })
-            }
-          : undefined
-      if (params.requireAgentStatus === 'sendable') {
+      const guardAgentStatus =
+        params.requireAgentStatus === 'sendable' ||
+        (inputOrigin === 'owner-automation' && params.agentPrompt === true)
+      const assertSendPreconditions = guardAgentStatus
+        ? (ptyId?: string): Promise<void> =>
+            assertTerminalSendAgentPreconditions(
+              runtime,
+              params.terminal,
+              ptyId,
+              params.client,
+              inputOrigin
+            )
+        : undefined
+      if (guardAgentStatus) {
         try {
           await assertSendPreconditions?.(leaf?.ptyId ?? undefined)
         } catch (error) {

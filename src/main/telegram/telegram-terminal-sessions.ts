@@ -14,10 +14,15 @@ import { assertTerminalAgentSendable } from '../runtime/rpc/terminal-agent-send-
 import { readTelegramOutputFiles } from './telegram-output-files'
 import type { TelegramSession, TelegramUserMessage } from './telegram-session-port'
 import { projectTelegramTerminal } from './telegram-terminal-projection'
+import { readTelegramTerminalHistory } from './telegram-terminal-history'
+import { TelegramInputNotDeliveredError } from './telegram-input-refusal'
 
 const SendResult = z.object({
   send: z.object({
     accepted: z.boolean(),
+    bytesWritten: z.number().nonnegative().optional(),
+    writeSettlement: z.object({ outcome: z.string() }).optional(),
+    refusedReason: z.enum(['no-agent', 'permission']).optional(),
     prompt: z.object({ stages: z.array(z.string()), observation: z.string() }).optional()
   })
 })
@@ -72,6 +77,20 @@ export class TelegramTerminalSessions {
 
   history(id: string): AgentJournalRenderItem[] {
     return this.entry(id).items
+  }
+
+  recentHistory(id: string, signal: AbortSignal): Promise<AgentJournalRenderItem[] | null> {
+    return readTelegramTerminalHistory(this.runtime, this.entry(id).terminal, signal)
+  }
+
+  async progress(id: string) {
+    const { terminal, session } = this.entry(id)
+    const read = await this.runtime.readTerminal(terminal.handle, { limit: 100 })
+    return {
+      key: String(session.turnStartedAt ?? session.status?.statusStartedAt ?? 0),
+      start: session.status?.latestPrompt ?? '',
+      lines: read.tail.slice(-100)
+    }
   }
 
   private entry(id: string): TerminalEntry {
@@ -139,16 +158,26 @@ export class TelegramTerminalSessions {
         orchestrationRequestId: operationId,
         orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION
       },
-      { authenticatedCallerFingerprint: 'telegram:owner' }
+      { authenticatedCallerFingerprint: 'telegram:owner', terminalInputOrigin: 'owner-automation' }
     )
     if (!response.ok) {
       throw new Error(response.error.message)
     }
     const { send } = SendResult.parse(response.result)
     if (!send.accepted) {
-      throw new Error(
-        'Storca не приняла ввод. Проверь состояние терминала и управление с телефона.'
-      )
+      const message =
+        send.refusedReason === 'permission'
+          ? 'Codex ждёт разрешения в терминале. Сообщение не передано. Подтверди запрос в Storca и отправь его снова.'
+          : send.refusedReason === 'no-agent'
+            ? 'Codex больше не запущен в этом терминале. Сообщение не передано. Запусти сессию в Storca.'
+            : 'Storca не подтвердила передачу ввода в терминал. Проверь связь с хостом и состояние сессии.'
+      if (
+        send.bytesWritten === 0 &&
+        (!send.writeSettlement || send.writeSettlement.outcome === 'refused')
+      ) {
+        throw new TelegramInputNotDeliveredError(message)
+      }
+      throw new Error(message)
     }
     return send
   }

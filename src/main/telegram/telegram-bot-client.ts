@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { setTimeout as delay } from 'node:timers/promises'
-import { TelegramBot, TelegramUpdate, type TelegramKeyboard } from './telegram-bot-schema'
+import {
+  TelegramBot,
+  TelegramUpdate,
+  type TelegramKeyboard,
+  type TelegramReplyMarkup
+} from './telegram-bot-schema'
 
 export const TELEGRAM_MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
 const API = 'https://api.telegram.org'
@@ -10,7 +15,9 @@ export class TelegramApiError extends Error {
   constructor(
     readonly code: number,
     readonly retryAfter: number = 1,
-    readonly topicMissing: boolean = false
+    readonly topicMissing: boolean = false,
+    readonly messageMissing: boolean = false,
+    readonly messageNotModified: boolean = false
   ) {
     super(
       code === 409
@@ -73,7 +80,9 @@ export class TelegramBotClient {
       throw new TelegramApiError(
         envelope.error_code ?? response.status,
         envelope.parameters?.retry_after,
-        /message thread not found|message_thread_not_found/i.test(envelope.description ?? '')
+        /message thread not found|message_thread_not_found/i.test(envelope.description ?? ''),
+        /message to edit not found|message_id_invalid/i.test(envelope.description ?? ''),
+        /message is not modified/i.test(envelope.description ?? '')
       )
     }
     return schema.parse(envelope.result)
@@ -110,8 +119,9 @@ export class TelegramBotClient {
     chatId: number,
     threadId: number | undefined,
     text: string,
-    keyboard?: TelegramKeyboard,
-    signal?: AbortSignal
+    keyboard?: TelegramReplyMarkup,
+    signal?: AbortSignal,
+    options?: { silent?: boolean }
   ): Promise<number> {
     const parts = splitTelegramText(text)
     let id = 0
@@ -122,6 +132,7 @@ export class TelegramBotClient {
           chat_id: chatId,
           message_thread_id: threadId,
           text: parts[index],
+          ...(options?.silent ? { disable_notification: true } : {}),
           ...(index === parts.length - 1 && keyboard ? { reply_markup: keyboard } : {}),
           link_preview_options: { is_disabled: true }
         },
@@ -139,7 +150,7 @@ export class TelegramBotClient {
     chatId: number,
     messageId: number,
     text: string,
-    keyboard: TelegramKeyboard,
+    keyboard: TelegramKeyboard | undefined,
     signal: AbortSignal
   ): Promise<void> {
     await this.call(

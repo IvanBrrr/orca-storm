@@ -1,8 +1,15 @@
 import type { TelegramSessionContext } from './telegram-session-context'
 import type { TelegramAction } from './telegram-integration-state'
 import { deliverTelegramQuestion, answerTelegramQuestionText } from './telegram-prompt-delivery'
-import { telegramSendReceiptText } from './telegram-message-input'
+import { sendTelegramPreparedMessage } from './telegram-input-delivery'
 import { routeTelegramWorktreeAction } from './telegram-worktree-creation'
+import { routeTelegramSessionNavigation } from './telegram-session-navigation'
+import {
+  deliverTelegramNavigationDraft,
+  latestTelegramNavigationDraft
+} from './telegram-navigation-draft'
+import { cancelTelegramTextPrompt } from './telegram-navigation-input'
+import { telegramSessionStatus } from './telegram-session-catalog'
 
 export async function routeOwnerAction(
   ctx: TelegramSessionContext,
@@ -12,6 +19,9 @@ export async function routeOwnerAction(
   updateId = 0,
   messageId?: number
 ): Promise<void> {
+  if (await routeTelegramSessionNavigation(ctx, action, threadId, messageId)) {
+    return
+  }
   await ctx.refresh()
   if (await routeTelegramWorktreeAction(ctx, action, threadId)) {
     return
@@ -30,7 +40,7 @@ export async function routeOwnerAction(
     return
   }
   if (action.kind === 'workspaces') {
-    await showTelegramWorkspaces(ctx, threadId, action.page)
+    await showTelegramWorkspaces(ctx, threadId, action.page, action.draftKey, messageId)
     return
   }
   if (action.kind === 'create') {
@@ -44,7 +54,13 @@ export async function routeOwnerAction(
       throw new Error('Сессия создана, но пока не появилась в списке Storca. Используй /sessions.')
     }
     const topic = await ctx.topic(session)
-    await ctx.text(topic.threadId, 'Новая сессия готова. Отправь первую задачу.')
+    await ctx.text(
+      topic.threadId,
+      action.draftKey
+        ? 'Новая сессия готова. Передаю сохранённую задачу.'
+        : 'Новая сессия готова. Отправь первую задачу.'
+    )
+    await deliverTelegramNavigationDraft(ctx, action.draftKey, session)
     return
   }
   if (action.kind === 'status') {
@@ -79,12 +95,17 @@ export async function routeOwnerAction(
       await ctx.state.save()
       return
     }
-    const queued = await ctx.port.send(
-      action.sessionId,
-      await ctx.operation(`draft:${key}`),
-      action.body
+    const session = ctx.sessions.get(action.sessionId)
+    if (!session || !threadId) {
+      throw new Error('Тема сессии недоступна.')
+    }
+    await sendTelegramPreparedMessage(
+      ctx,
+      session,
+      key,
+      action.operationId ?? (await ctx.operation(`draft:${key}`)),
+      threadId
     )
-    await ctx.text(threadId, telegramSendReceiptText(ctx.sessions.get(action.sessionId), queued))
   } else if (action.kind === 'prompt') {
     const prompt = await ctx.port.prompt(action.sessionId, action.itemId)
     if (
@@ -127,15 +148,7 @@ export async function showTelegramStatus(
   if (!session) {
     throw new Error('Сессия недоступна. Связь с хостом может быть потеряна.')
   }
-  const status = !session.visible
-    ? 'Закрыта'
-    : session.status?.status === 'working'
-      ? 'Работает'
-      : session.status?.status === 'attention'
-        ? 'Ждёт ответа'
-        : session.status?.status === 'idle'
-          ? 'Ожидает задачу'
-          : 'Состояние пока неизвестно'
+  const status = telegramSessionStatus(session)
   await ctx.text(
     threadId,
     `${session.name}\n${status}${session.status?.toolName ? `\nИнструмент: ${session.status.toolName}` : ''}`
@@ -145,22 +158,34 @@ export async function showTelegramStatus(
 export async function showTelegramWorkspaces(
   ctx: TelegramSessionContext,
   threadId?: number,
-  page = 0
+  page = 0,
+  draftKey?: string,
+  messageId?: number
 ): Promise<void> {
+  cancelTelegramTextPrompt(ctx, threadId)
+  draftKey ??= latestTelegramNavigationDraft(ctx, threadId)
   const workspaces = await ctx.port.workspaces()
   const sorted = [...workspaces].sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0))
   const rows = sorted
     .slice(page * 8, (page + 1) * 8)
     .map((workspace) => [
-      ctx.button(workspace.name, { kind: 'create', workspace: workspace.id }, threadId)
+      ctx.button(workspace.name, { kind: 'create', workspace: workspace.id, draftKey }, threadId)
     ])
-  rows.unshift([ctx.button('Новый ворктрии', { kind: 'new-worktree', page: 0 }, threadId)])
+  rows.unshift(
+    [ctx.button('Новый ворктрии', { kind: 'new-worktree', page: 0, draftKey }, threadId)],
+    [
+      ctx.button(
+        'Продолжить существующую сессию',
+        { kind: 'sessions', page: 0, draftKey },
+        threadId
+      )
+    ]
+  )
   if (page > 0) {
-    rows.push([ctx.button('Назад', { kind: 'workspaces', page: page - 1 }, threadId)])
+    rows.push([ctx.button('Назад', { kind: 'workspaces', page: page - 1, draftKey }, threadId)])
   }
   if ((page + 1) * 8 < workspaces.length) {
-    rows.push([ctx.button('Далее', { kind: 'workspaces', page: page + 1 }, threadId)])
+    rows.push([ctx.button('Далее', { kind: 'workspaces', page: page + 1, draftKey }, threadId)])
   }
-  await ctx.state.save()
-  await ctx.text(threadId, 'Где создать сессию Codex?', { inline_keyboard: rows })
+  await ctx.menu(threadId, messageId, 'Где создать сессию Codex?', { inline_keyboard: rows })
 }
