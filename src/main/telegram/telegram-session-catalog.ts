@@ -4,6 +4,7 @@ import type { TelegramSession } from './telegram-session-port'
 import { telegramHistoryText } from './telegram-session-history'
 import { latestTelegramNavigationDraft } from './telegram-navigation-draft'
 import type { TelegramKeyboard } from './telegram-bot-schema'
+import { recentTelegramSessions } from './telegram-session-order'
 
 export type TelegramCatalogOptions = {
   page?: number
@@ -43,10 +44,7 @@ export async function showTelegramSessions(
   options: TelegramCatalogOptions = {}
 ): Promise<void> {
   await ctx.refresh()
-  const visible = [...ctx.sessions.values()].filter((session) => session.visible)
-  const sessions = visible.sort(
-    (left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id)
-  )
+  const sessions = recentTelegramSessions(ctx.sessions.values())
   const pages = Math.max(1, Math.ceil(sessions.length / 10))
   const page = Math.max(0, Math.min(options.page ?? 0, pages - 1))
   const draftKey = options.draftKey ?? latestTelegramNavigationDraft(ctx, threadId)
@@ -77,7 +75,7 @@ export async function showTelegramSessions(
     rows.push(navigation)
   }
   rows.push([ctx.button('Новая сессия', { kind: 'workspaces', page: 0, draftKey }, threadId)])
-  const heading = `Сессий Storca: ${visible.length}. Сначала недавние.\nСтраница ${page + 1} из ${pages}.`
+  const heading = `Сессий Storca: ${sessions.length}. Сначала недавние.\nСтраница ${page + 1} из ${pages}.`
   const empty = sessions.length ? '' : '\nСоздай новую сессию или открой её в Storca.'
   await ctx.menu(
     threadId,

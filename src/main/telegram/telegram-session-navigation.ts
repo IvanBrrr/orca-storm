@@ -4,6 +4,7 @@ import { cancelTelegramTextPrompt } from './telegram-navigation-input'
 import { showTelegramSessions, showTelegramSessionCard } from './telegram-session-catalog'
 import { deliverTelegramNavigationDraft } from './telegram-navigation-draft'
 import { syncTelegramSessionProgress } from './telegram-session-progress'
+import { deliverTelegramSessionHistory } from './telegram-session-history'
 
 export async function routeTelegramSessionNavigation(
   ctx: TelegramSessionContext,
@@ -42,6 +43,7 @@ export async function routeTelegramSessionNavigation(
       silent: true
     })
     if (session.agent === 'codex') {
+      await deliverTelegramSessionHistory(ctx, session, topic)
       await syncTelegramSessionProgress(ctx, session, topic, true, { snapshot: true })
     }
   }

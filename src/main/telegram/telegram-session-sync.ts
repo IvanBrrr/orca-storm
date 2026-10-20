@@ -5,6 +5,9 @@ import type { TelegramTopic } from './telegram-integration-state'
 import { deliverTelegramSessionHistory } from './telegram-session-history'
 import { syncTelegramSessionProgress } from './telegram-session-progress'
 import { isRootAgentJournalItem } from '../../shared/agent-session-journal-producer'
+import { recentTelegramSessions } from './telegram-session-order'
+
+const AUTOMATIC_SESSION_LIMIT = 10
 
 function completedMessage(item: AgentJournalRenderItem): boolean {
   return (
@@ -19,7 +22,14 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
   if (!ctx.state.data.ownerId) {
     return
   }
-  await ctx.exclusive(() => ctx.refresh())
+  const automaticSessions = await ctx.exclusive(async () => {
+    await ctx.refresh()
+    return new Set(
+      recentTelegramSessions(ctx.sessions.values())
+        .slice(0, AUTOMATIC_SESSION_LIMIT)
+        .map((session) => session.id)
+    )
+  })
   const away = ctx.isAway() !== false
   const becameAway = away && !ctx.wasAway
   ctx.wasAway = away
@@ -29,6 +39,9 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
       await ctx.exclusive(async () => {
         const session = ctx.sessions.get(sessionId)
         if (!session || (!session.visible && !ctx.state.data.topics[sessionId])) {
+          return
+        }
+        if (session.visible && !automaticSessions.has(sessionId) && !ctx.requested.has(sessionId)) {
           return
         }
         const topic = await ctx.topic(session)
