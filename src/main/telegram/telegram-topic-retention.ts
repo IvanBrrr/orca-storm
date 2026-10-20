@@ -9,7 +9,7 @@ export function telegramTopicOpenedAt(ctx: TelegramSessionContext): number {
     openedAt = Math.max(openedAt, session.updatedAt + 1)
   }
   for (const topic of Object.values(ctx.state.data.topics)) {
-    openedAt = Math.max(openedAt, (topic.lastOpenedAt ?? 0) + 1)
+    openedAt = Math.max(openedAt, topic.lastUpdated + 1, (topic.lastOpenedAt ?? 0) + 1)
   }
   return openedAt
 }
@@ -17,14 +17,22 @@ export function telegramTopicOpenedAt(ctx: TelegramSessionContext): number {
 export function retainedTelegramSessionIds(ctx: TelegramSessionContext, preferredId?: string) {
   const activity = (id: string, updatedAt: number) =>
     Math.max(updatedAt, ctx.state.data.topics[id]?.lastOpenedAt ?? 0)
-  const sessions = [...ctx.sessions.values()]
-    .filter((session) => session.visible)
-    .sort((left, right) => {
-      return (
-        activity(right.id, right.updatedAt) - activity(left.id, left.updatedAt) ||
-        left.id.localeCompare(right.id)
-      )
-    })
+  const candidates = new Map(
+    [...ctx.sessions.values()]
+      .filter((session) => session.visible)
+      .map((session) => [session.id, { id: session.id, updatedAt: session.updatedAt }])
+  )
+  for (const [id, topic] of Object.entries(ctx.state.data.topics)) {
+    if (!ctx.sessions.has(id) && !topic.closed) {
+      candidates.set(id, { id, updatedAt: topic.lastUpdated })
+    }
+  }
+  const sessions = [...candidates.values()].sort((left, right) => {
+    return (
+      activity(right.id, right.updatedAt) - activity(left.id, left.updatedAt) ||
+      left.id.localeCompare(right.id)
+    )
+  })
   return new Set(
     [
       ...new Set([

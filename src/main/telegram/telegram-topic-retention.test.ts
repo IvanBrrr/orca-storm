@@ -180,6 +180,22 @@ it('does not evict an unanswered Telegram task to open another session', async (
   expect(Object.keys(h.state.data.topics)).toHaveLength(10)
 })
 
+it('keeps the ten most recent known topics while the session inventory is unavailable', async () => {
+  const h = await existingTopics()
+  const saved = [...h.sessions]
+  h.sessions.length = 0
+  await syncTelegramSessions(h.ctx)
+  expect(Object.keys(h.state.data.topics)).toHaveLength(10)
+  expect(h.state.data.topics['session-0']).toBeUndefined()
+  expect(h.sent.filter((entry) => entry.method === 'deleteForumTopic')).toHaveLength(1)
+  await h.state.load()
+  await syncTelegramSessions(h.ctx)
+  expect(Object.keys(h.state.data.topics)).toHaveLength(10)
+  h.sessions.push(...saved)
+  await syncTelegramSessions(h.ctx)
+  expect(h.sent.some((entry) => entry.method === 'createForumTopic')).toBe(false)
+})
+
 it('delivers an awaited answer despite an unrelated deletion failure and does not create more topics', async () => {
   const h = await existingTopics()
   const session = h.sessions[10]!
