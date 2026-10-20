@@ -12,7 +12,6 @@ import { TelegramApiError } from './telegram-bot-client'
 import { answerTelegramWorktreeName } from './telegram-worktree-creation'
 import { sendTelegramSessionMessage } from './telegram-session-input'
 import { cancelTelegramTextPrompt } from './telegram-navigation-input'
-import { answerTelegramSessionSearch } from './telegram-session-navigation'
 import { showTelegramSessions } from './telegram-session-catalog'
 import { saveTelegramNavigationDraft } from './telegram-navigation-draft'
 
@@ -127,9 +126,6 @@ async function routeOwnerMessage(
     await showTelegramWorkspaces(ctx, threadId)
     return
   }
-  if (await answerTelegramSessionSearch(ctx, message, updateId)) {
-    return
-  }
   if (await answerTelegramWorktreeName(ctx, message, updateId)) {
     return
   }
@@ -141,9 +137,31 @@ async function routeOwnerMessage(
   await ctx.refresh()
   const session = ctx.sessionForThread(threadId)
   if (!session || !threadId) {
+    const binding = Object.entries(ctx.state.data.topics).find(
+      ([, topic]) => topic.threadId === threadId
+    )
     const draftKey = command?.startsWith('/')
       ? undefined
-      : await saveTelegramNavigationDraft(ctx, message, updateId)
+      : await saveTelegramNavigationDraft(ctx, message, updateId, binding?.[0])
+    if (binding) {
+      await ctx.menu(
+        threadId,
+        undefined,
+        `Эта тема связана с сессией «${binding[1].name}». Сейчас Storca не может подтвердить её доступность.${draftKey ? '\n\nСообщение сохранено для этой сессии. Проверь связь с её хостом или открой сессию в Storca, затем нажми кнопку.' : ''}`,
+        {
+          inline_keyboard: [
+            [
+              ctx.button(
+                draftKey ? 'Повторить в этой сессии' : 'Проверить сессию',
+                { kind: 'session-open', sessionId: binding[0], draftKey },
+                threadId
+              )
+            ]
+          ]
+        }
+      )
+      return
+    }
     await showTelegramSessions(ctx, threadId, { draftKey })
     return
   }

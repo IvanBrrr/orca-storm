@@ -13,7 +13,11 @@ import { TERMINAL_SEND_METHODS } from '../runtime/rpc/methods/terminal/terminal-
 import { assertTerminalAgentSendable } from '../runtime/rpc/terminal-agent-send-guard'
 import { readTelegramOutputFiles } from './telegram-output-files'
 import type { TelegramSession, TelegramUserMessage } from './telegram-session-port'
-import { projectTelegramTerminal } from './telegram-terminal-projection'
+import {
+  projectTelegramTerminal,
+  telegramTerminalSessionSurface,
+  telegramTerminalSessionId
+} from './telegram-terminal-projection'
 import { readTelegramTerminalHistory } from './telegram-terminal-history'
 import { TelegramInputNotDeliveredError } from './telegram-input-refusal'
 
@@ -45,8 +49,26 @@ export class TelegramTerminalSessions {
     const listing = await this.runtime.listTerminals(undefined, 10_000)
     const rows = this.runtime.getAgentStatusSnapshotFn?.() ?? []
     const found = new Set<string>()
-    for (const terminal of listing.terminals) {
-      if (terminal.orphaned || !terminal.agentIdentity || !terminal.tabId || !terminal.leafId) {
+    const candidates = listing.terminals
+      .map(telegramTerminalSessionSurface)
+      .filter((terminal) => terminal !== null)
+    const attached = new Set(
+      candidates.filter((terminal) => !terminal.orphaned).map(telegramTerminalSessionId)
+    )
+    const orphanCounts = new Map<string, number>()
+    for (const terminal of candidates.filter((terminal) => terminal.orphaned)) {
+      const id = telegramTerminalSessionId(terminal)
+      orphanCounts.set(id, (orphanCounts.get(id) ?? 0) + 1)
+    }
+    for (const terminal of candidates) {
+      if (!terminal.agentIdentity || !terminal.tabId || !terminal.leafId) {
+        continue
+      }
+      if (terminal.orphaned && attached.has(telegramTerminalSessionId(terminal))) {
+        continue
+      }
+      if (terminal.orphaned && orphanCounts.get(telegramTerminalSessionId(terminal)) !== 1) {
+        this.entries.delete(telegramTerminalSessionId(terminal))
         continue
       }
       const projection = projectTelegramTerminal(terminal, rows)

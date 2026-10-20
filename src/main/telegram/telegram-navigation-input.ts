@@ -35,7 +35,10 @@ export function telegramTextPromptKey(
     return answered[0]
   }
   if (message.reply_to_message) {
-    return ctx.state.data.replies[String(message.reply_to_message.message_id)]
+    const reply = ctx.state.data.replies[String(message.reply_to_message.message_id)]
+    if (reply) {
+      return reply
+    }
   }
   return Object.entries(ctx.state.data.actions).findLast(
     ([, action]) =>

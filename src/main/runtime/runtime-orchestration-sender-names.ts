@@ -102,10 +102,13 @@ export class RuntimeOrchestrationSenderNames {
     }
     const pty = record.ptyId ? this.deps.getPtyAgents(record.ptyId) : undefined
     const session = this.deps.getWorkspaceSession(record.worktreeId)
-    const tab = session?.tabsByWorktree?.[record.worktreeId]?.find(
-      (candidate) => candidate.id === record.tabId
-    )
     const paneKey = this.deps.getTerminalPaneKey(handle)
+    const tabId = record.tabId.startsWith('pty:')
+      ? (parsePaneKey(paneKey ?? '')?.tabId ?? record.tabId)
+      : record.tabId
+    const tab = session?.tabsByWorktree?.[record.worktreeId]?.find(
+      (candidate) => candidate.id === tabId
+    )
     const status = paneKey
       ? this.deps
           .getAgentStatusSnapshotForPane(paneKey)
@@ -121,8 +124,7 @@ export class RuntimeOrchestrationSenderNames {
     const trackedTitle = record.ptyId ? this.deps.getTrackedTitle(record.ptyId) : null
     return {
       tab: tab ? { ...tab, title: tab.title ?? '', customTitle: tab.customTitle ?? null } : null,
-      paneTitle:
-        trackedTitle ?? splitPaneTitle(session?.terminalLayoutsByTabId?.[record.tabId], paneKey),
+      paneTitle: trackedTitle ?? splitPaneTitle(session?.terminalLayoutsByTabId?.[tabId], paneKey),
       agent: status?.agentType ?? pty?.launchAgent ?? pty?.foregroundAgent ?? null,
       providerSessionId: status?.providerSession?.id,
       paneKey

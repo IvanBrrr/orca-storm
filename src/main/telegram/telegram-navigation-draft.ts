@@ -20,13 +20,14 @@ export function latestTelegramNavigationDraft(
 export async function saveTelegramNavigationDraft(
   ctx: TelegramSessionContext,
   message: TelegramMessage,
-  updateId: number
+  updateId: number,
+  targetSessionId?: string
 ): Promise<string> {
   const identity = ctx.identity(`route:${updateId}`)
   const key = hashTelegramPairingNonce(identity).slice(0, 24)
   if (!ctx.state.data.actions[key]) {
     ctx.state.action(
-      { kind: 'route-draft', message, updateId },
+      { kind: 'route-draft', message, updateId, targetSessionId },
       message.message_thread_id,
       identity
     )

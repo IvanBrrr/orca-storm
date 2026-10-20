@@ -51,7 +51,7 @@ it('pages every session by recent activity and edits the same menu with reusable
   expect(h.sent.filter((s) => s.method === 'sendMessage')).toHaveLength(1)
 })
 
-it('searches the whole catalog with a plain reply after restart and preserves the query on back', async () => {
+it('opens all active sessions from a saved Find button without asking for text', async () => {
   const h = await telegramTestFixture()
   h.sessions.push({
     ...h.sessions[0]!,
@@ -61,27 +61,26 @@ it('searches the whole catalog with a plain reply after restart and preserves th
     updatedAt: 0
   })
   const search = h.state.action({ kind: 'session-search' })
-  await routeTelegramUpdate(h.ctx, telegramTestCallback(search))
+  h.state.action({ kind: 'session-query' })
+  await h.state.save()
   await h.state.load()
-  await routeTelegramUpdate(h.ctx, {
-    update_id: 2,
-    message: telegramTestMessage({ text: 'ЕЛКА старая', message_thread_id: undefined })
-  })
+  await routeTelegramUpdate(h.ctx, telegramTestCallback(search))
   expect(h.send).not.toHaveBeenCalled()
-  expect(h.sent.at(-1)?.params.text).toContain('Найдено: 1.')
+  expect(h.sent.at(-1)?.params.text).toContain('Сессий Storca: 2.')
+  expect(h.sent.at(-1)?.method).toBe('editMessageText')
+  expect(
+    Object.values(h.state.data.actions).filter((s) => s.action.kind === 'session-query' && !s.used)
+  ).toHaveLength(0)
+  expect(h.sent.some((s) => String(s.params.text).includes('Напиши название'))).toBe(false)
   const select = Object.entries(h.state.data.actions).find(
     ([, s]) => s.action.kind === 'session-select' && s.action.sessionId === 'old'
   )!
   await routeTelegramUpdate(h.ctx, telegramTestCallback(select[0]))
   const back = Object.entries(h.state.data.actions).find(
-    ([, s]) => s.action.kind === 'sessions' && s.action.query === 'ЕЛКА старая'
+    ([, s]) => s.action.kind === 'sessions' && s.action.page === 0
   )!
   await routeTelegramUpdate(h.ctx, telegramTestCallback(back[0]))
-  expect(h.sent.at(-1)?.params.text).toContain('Поиск: ЕЛКА старая')
-  await routeTelegramUpdate(h.ctx, {
-    update_id: 2,
-    message: telegramTestMessage({ text: 'ЕЛКА старая', message_thread_id: undefined })
-  })
+  expect(h.sent.at(-1)?.params.text).toContain('Сессий Storca: 2.')
   expect(Object.values(h.state.data.actions).some((s) => s.action.kind === 'route-draft')).toBe(
     false
   )
@@ -161,16 +160,12 @@ it('carries the saved task through /new and a plain worktree name without forwar
   ).toHaveLength(1)
 })
 
-it('recovers an empty search and an out-of-range page, and refuses a session closed after selection', async () => {
+it('ignores old search filters, clamps pages and refuses a session closed after selection', async () => {
   const h = await telegramTestFixture()
   const empty = h.state.action({ kind: 'sessions', page: 99, query: 'Missing' })
   await routeTelegramUpdate(h.ctx, telegramTestCallback(empty))
-  expect(h.sent.at(-1)?.params.text).toContain('Ничего не найдено')
+  expect(h.sent.at(-1)?.params.text).toContain('Сессий Storca: 1.')
   expect(h.sent.at(-1)?.params.text).toContain('Страница 1 из 1')
-  const all = Object.entries(h.state.data.actions).find(
-    ([, s]) => s.action.kind === 'sessions' && !s.action.query
-  )!
-  await routeTelegramUpdate(h.ctx, telegramTestCallback(all[0]))
   const select = Object.entries(h.state.data.actions).find(
     ([, s]) => s.action.kind === 'session-select'
   )!

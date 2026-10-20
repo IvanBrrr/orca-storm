@@ -104,7 +104,11 @@ it('accepts a plain next message as the worktree name after restart and requests
   await h.state.load()
   await routeTelegramUpdate(h.ctx, {
     update_id: 40,
-    message: telegramTestMessage({ text: 'Что как', message_thread_id: undefined })
+    message: telegramTestMessage({
+      text: 'Что как',
+      message_thread_id: undefined,
+      reply_to_message: { message_id: 74 }
+    })
   })
   expect(createWorkspace).toHaveBeenCalledExactlyOnceWith('repo-1', 'Что как', expect.any(String))
   expect(h.state.data.topics['session-2']).toBeDefined()

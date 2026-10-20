@@ -4,6 +4,26 @@ import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
 import type { AgentJournalRenderItem } from '../../shared/agent-session-journal-types'
 import type { TelegramSession } from './telegram-session-port'
 import { selectFreshExplicitAgentStatusRow } from '../runtime/runtime-hook-agent-row-selection'
+import { parsePaneKey } from '../../shared/stable-pane-id'
+
+export function telegramTerminalSessionSurface(
+  terminal: RuntimeTerminalSummary
+): RuntimeTerminalSummary | null {
+  if (!terminal.orphaned) {
+    return terminal
+  }
+  const pane = parsePaneKey(terminal.recordedPaneKey ?? '')
+  if (
+    !pane ||
+    !terminal.executionHostId ||
+    !terminal.agentIdentity ||
+    (!terminal.connected && terminal.exitCause)
+  ) {
+    return null
+  }
+  // A missing UI surface does not end the host's live conversation or change its topic identity.
+  return { ...terminal, tabId: pane.tabId, leafId: pane.leafId }
+}
 
 export function telegramTerminalSessionId(terminal: RuntimeTerminalSummary): string {
   const identity = [terminal.executionHostId, terminal.worktreeId, terminal.tabId, terminal.leafId]
@@ -15,16 +35,18 @@ export function projectTelegramTerminal(
   rows: readonly AgentStatusIpcPayload[]
 ): { session: TelegramSession; items: AgentJournalRenderItem[] } {
   const id = telegramTerminalSessionId(terminal)
-  const row = selectFreshExplicitAgentStatusRow({
-    handles: [terminal.handle],
-    paneKeys: [`${terminal.tabId}:${terminal.leafId}`],
-    hookRows: rows.filter(
-      (candidate) =>
-        !candidate.structuredHost &&
-        candidate.worktreeId === terminal.worktreeId &&
-        candidate.agentType === terminal.agentIdentity
-    )
-  })
+  const row = !terminal.connected
+    ? null
+    : selectFreshExplicitAgentStatusRow({
+        handles: [terminal.handle],
+        paneKeys: [`${terminal.tabId}:${terminal.leafId}`],
+        hookRows: rows.filter(
+          (candidate) =>
+            !candidate.structuredHost &&
+            candidate.worktreeId === terminal.worktreeId &&
+            candidate.agentType === terminal.agentIdentity
+        )
+      })
   const status =
     row?.state === 'working' ? 'working' : row?.state === 'done' ? 'idle' : row ? 'attention' : null
   const updatedAt = row?.receivedAt ?? terminal.lastOutputAt ?? 0

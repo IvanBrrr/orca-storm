@@ -24,10 +24,6 @@ export function telegramSessionStatus(session: TelegramSession): string {
           : 'Состояние пока неизвестно'
 }
 
-function searchText(text: string): string {
-  return text.normalize('NFKC').toLocaleLowerCase('ru').replaceAll('ё', 'е')
-}
-
 export function telegramNavigationDraftPreview(ctx: TelegramSessionContext, key?: string): string {
   const stored = key ? ctx.state.data.actions[key] : undefined
   if (!stored || stored.used || stored.action.kind !== 'route-draft') {
@@ -47,20 +43,14 @@ export async function showTelegramSessions(
   options: TelegramCatalogOptions = {}
 ): Promise<void> {
   await ctx.refresh()
-  const query = options.query?.trim().slice(0, 120) ?? ''
-  const words = searchText(query).split(/\s+/).filter(Boolean)
   const visible = [...ctx.sessions.values()].filter((session) => session.visible)
-  const sessions = visible
-    .filter((session) =>
-      words.every((word) =>
-        searchText(`${session.workspaceName ?? ''} ${session.name} ${session.agent}`).includes(word)
-      )
-    )
-    .sort((left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id))
+  const sessions = visible.sort(
+    (left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id)
+  )
   const pages = Math.max(1, Math.ceil(sessions.length / 10))
   const page = Math.max(0, Math.min(options.page ?? 0, pages - 1))
   const draftKey = options.draftKey ?? latestTelegramNavigationDraft(ctx, threadId)
-  const rows = [[ctx.button('Найти сессию', { kind: 'session-search', draftKey }, threadId)]]
+  const rows: TelegramKeyboard['inline_keyboard'] = []
   for (const session of sessions.slice(page * 10, (page + 1) * 10)) {
     const state =
       session.status?.status === 'working'
@@ -71,35 +61,24 @@ export async function showTelegramSessions(
     rows.push([
       ctx.button(
         `${state} ${telegramTopicName(session)}`,
-        { kind: 'session-select', sessionId: session.id, page, query, draftKey },
+        { kind: 'session-select', sessionId: session.id, page, draftKey },
         threadId
       )
     ])
   }
   const navigation: TelegramKeyboard['inline_keyboard'][number] = []
   if (page > 0) {
-    navigation.push(
-      ctx.button('Назад', { kind: 'sessions', page: page - 1, query, draftKey }, threadId)
-    )
+    navigation.push(ctx.button('Назад', { kind: 'sessions', page: page - 1, draftKey }, threadId))
   }
   if (page + 1 < pages) {
-    navigation.push(
-      ctx.button('Далее', { kind: 'sessions', page: page + 1, query, draftKey }, threadId)
-    )
+    navigation.push(ctx.button('Далее', { kind: 'sessions', page: page + 1, draftKey }, threadId))
   }
   if (navigation.length) {
     rows.push(navigation)
   }
-  if (query) {
-    rows.push([ctx.button('Все сессии', { kind: 'sessions', page: 0, draftKey }, threadId)])
-  }
   rows.push([ctx.button('Новая сессия', { kind: 'workspaces', page: 0, draftKey }, threadId)])
-  const heading = `Сессий Storca: ${visible.length}. ${query ? `Найдено: ${sessions.length}.\nПоиск: ${query}` : 'Сначала недавние.'}\nСтраница ${page + 1} из ${pages}.`
-  const empty = sessions.length
-    ? ''
-    : query
-      ? '\nНичего не найдено. Измени запрос или покажи все сессии.'
-      : '\nСоздай новую сессию или открой её в Storca.'
+  const heading = `Сессий Storca: ${visible.length}. Сначала недавние.\nСтраница ${page + 1} из ${pages}.`
+  const empty = sessions.length ? '' : '\nСоздай новую сессию или открой её в Storca.'
   await ctx.menu(
     threadId,
     options.messageId,
