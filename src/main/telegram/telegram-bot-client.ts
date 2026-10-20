@@ -132,7 +132,7 @@ export class TelegramBotClient {
           chat_id: chatId,
           message_thread_id: threadId,
           text: parts[index],
-          ...(options?.silent ? { disable_notification: true } : {}),
+          disable_notification: options?.silent !== false || index !== parts.length - 1,
           ...(index === parts.length - 1 && keyboard ? { reply_markup: keyboard } : {}),
           link_preview_options: { is_disabled: true }
         },
@@ -208,12 +208,14 @@ export class TelegramBotClient {
     threadId: number,
     bytes: Uint8Array,
     name: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    options?: { silent?: boolean }
   ): Promise<void> {
     await this.waitForSendSlot(signal)
     const form = new FormData()
     form.set('chat_id', String(chatId))
     form.set('message_thread_id', String(threadId))
+    form.set('disable_notification', String(options?.silent !== false))
     form.set('document', new Blob([new Uint8Array(bytes)]), name)
     const response = await this.fetcher(`${API}/bot${this.token}/sendDocument`, {
       method: 'POST',

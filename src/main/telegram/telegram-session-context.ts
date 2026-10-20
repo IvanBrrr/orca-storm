@@ -36,13 +36,21 @@ export class TelegramSessionContext {
       this.requested.add(sessionId)
     }
   }
-  request(sessionId: string): void {
+  request(sessionId: string, notifyReply = false): void {
     this.requested.add(sessionId)
     this.state.data.replySessions = [...this.requested]
+    const topic = this.state.data.topics[sessionId]
+    if (topic && notifyReply) {
+      topic.notifyReply = true
+    }
   }
   finishRequest(sessionId: string): void {
     this.requested.delete(sessionId)
     this.state.data.replySessions = [...this.requested]
+    const topic = this.state.data.topics[sessionId]
+    if (topic) {
+      topic.notifyReply = false
+    }
   }
 
   exclusive<T>(work: () => Promise<T>): Promise<T> {
@@ -95,13 +103,18 @@ export class TelegramSessionContext {
       return this.client.text(owner, replacement, text, keyboard, this.signal, options)
     }
   }
-  async document(threadId: number, bytes: Uint8Array, name: string): Promise<void> {
+  async document(
+    threadId: number,
+    bytes: Uint8Array,
+    name: string,
+    options?: { silent?: boolean }
+  ): Promise<void> {
     const owner = this.state.data.ownerId
     if (!owner) {
       throw new Error('Telegram ещё не привязан к владельцу.')
     }
     try {
-      await this.client.document(owner, threadId, bytes, name, this.signal)
+      await this.client.document(owner, threadId, bytes, name, this.signal, options)
     } catch (error) {
       if (!(error instanceof TelegramApiError) || !error.topicMissing) {
         throw error
@@ -111,7 +124,8 @@ export class TelegramSessionContext {
         await this.replaceDeletedTopic(threadId),
         bytes,
         name,
-        this.signal
+        this.signal,
+        options
       )
     }
   }

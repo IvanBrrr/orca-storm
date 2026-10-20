@@ -4,10 +4,14 @@ import { deliverTelegramPrompt } from './telegram-prompt-delivery'
 import type { TelegramTopic } from './telegram-integration-state'
 import { deliverTelegramSessionHistory } from './telegram-session-history'
 import { syncTelegramSessionProgress } from './telegram-session-progress'
+import { isRootAgentJournalItem } from '../../shared/agent-session-journal-producer'
 
 function completedMessage(item: AgentJournalRenderItem): boolean {
   return (
-    item.body.kind === 'message' && item.body.role === 'assistant' && item.body.state !== 'running'
+    isRootAgentJournalItem(item) &&
+    item.body.kind === 'message' &&
+    item.body.role === 'assistant' &&
+    item.body.state !== 'running'
   )
 }
 
@@ -84,7 +88,17 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
               continue
             }
             if (deliver) {
-              await sendTelegramAssistantMessage(ctx, sessionId, topic, item)
+              await sendTelegramAssistantMessage(
+                ctx,
+                sessionId,
+                topic,
+                item,
+                ctx.requested.has(sessionId) &&
+                  topic.notifyReply === true &&
+                  !topic.progress?.pendingStart &&
+                  session.status?.status === 'idle' &&
+                  item === messages.at(-1)
+              )
               deliveredMessage = true
             }
             ctx.remember(topic, key)
@@ -151,7 +165,8 @@ async function sendTelegramAssistantMessage(
   ctx: TelegramSessionContext,
   sessionId: string,
   topic: TelegramTopic,
-  item: AgentJournalRenderItem
+  item: AgentJournalRenderItem,
+  notifyReply: boolean
 ): Promise<void> {
   if (item.body.kind !== 'message') {
     return
@@ -167,13 +182,18 @@ async function sendTelegramAssistantMessage(
   if (text.length > 10_000) {
     await ctx.text(
       topic.threadId,
-      `${Array.from(text).slice(0, 1500).join('')}\n\nПолный ответ прикреплён файлом.`
+      `${Array.from(text).slice(0, 1500).join('')}\n\nПолный ответ прикреплён файлом.`,
+      undefined,
+      { silent: !notifyReply }
     )
     await ctx.document(topic.threadId, Buffer.from(text), 'answer.md')
   } else if (text) {
-    await ctx.text(topic.threadId, text)
+    await ctx.text(topic.threadId, text, undefined, { silent: !notifyReply })
   }
-  for (const file of await ctx.port.outputFiles(sessionId, [item])) {
-    await ctx.client.document(ownerId, topic.threadId, file.bytes, file.name, ctx.signal)
+  const files = await ctx.port.outputFiles(sessionId, [item])
+  for (const [index, file] of files.entries()) {
+    await ctx.document(topic.threadId, file.bytes, file.name, {
+      silent: !notifyReply || Boolean(text) || index > 0
+    })
   }
 }

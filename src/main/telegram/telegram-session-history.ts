@@ -36,7 +36,24 @@ export async function deliverTelegramSessionHistory(
   if (!items) {
     return
   }
-  const messages = items.filter((item) => telegramHistoryText(item)).slice(-10)
+  const current = await ctx.port.history(session.id)
+  const pendingReply =
+    ctx.requested.has(session.id) &&
+    topic.notifyReply &&
+    !topic.progress?.pendingStart &&
+    session.status?.status === 'idle'
+      ? current.findLast(
+          (item) =>
+            item.body.kind === 'message' &&
+            item.body.role === 'assistant' &&
+            telegramHistoryText(item) &&
+            !topic.seen.includes(`message:${item.itemId}`)
+        )
+      : undefined
+  const pendingText = pendingReply ? telegramHistoryText(pendingReply) : ''
+  const messages = items
+    .filter((item) => telegramHistoryText(item) && telegramHistoryText(item) !== pendingText)
+    .slice(-10)
   for (const item of messages) {
     const key = `history:${item.itemId}`
     if (topic.seen.includes(key)) {
@@ -57,7 +74,7 @@ export async function deliverTelegramSessionHistory(
     await ctx.state.save()
   }
   const deliveredTexts = new Set(messages.map(telegramHistoryText))
-  for (const item of await ctx.port.history(session.id)) {
+  for (const item of current) {
     if (deliveredTexts.has(telegramHistoryText(item))) {
       ctx.remember(topic, `message:${item.itemId}`)
     }

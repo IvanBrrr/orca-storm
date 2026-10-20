@@ -71,6 +71,7 @@ export async function sendTelegramPreparedMessage(
     )
     return
   }
+  ctx.request(session.id, true)
   input.used = true
   await ctx.state.save()
   await ctx.text(threadId, telegramSendReceiptText(session, queued), undefined, { silent: true })

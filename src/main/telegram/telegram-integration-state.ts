@@ -106,6 +106,7 @@ const Topic = z.object({
   closed: z.boolean().default(false),
   seen: z.array(z.string()).default([]),
   historyDelivered: z.boolean().optional(),
+  notifyReply: z.boolean().optional(),
   progress: z
     .object({
       key: z.string(),

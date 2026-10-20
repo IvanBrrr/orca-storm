@@ -7,7 +7,7 @@ import { telegramTestFixture, telegramTestItem } from './telegram-test-fixture'
 it('edits one quiet message during a turn, throttles updates and sends the final reply separately', async () => {
   const h = await telegramTestFixture()
   await syncTelegramSessions(h.ctx)
-  h.ctx.request('session-1')
+  h.ctx.request('session-1', true)
   const session = h.sessions[0]!
   session.status = {
     sessionId: session.id,
@@ -52,7 +52,7 @@ it('edits one quiet message during a turn, throttles updates and sends the final
   ).toHaveLength(1)
   expect(
     h.sent.find((entry) => entry.params.text === 'Final answer')?.params.disable_notification
-  ).toBeUndefined()
+  ).toBe(false)
   expect(topic.progress?.settled).toBe(true)
 })
 

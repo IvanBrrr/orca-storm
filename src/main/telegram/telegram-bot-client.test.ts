@@ -75,7 +75,7 @@ it('splits long Unicode replies without breaking surrogate pairs or exceeding Te
   expect(parts.every((part) => part.length <= 3500 && !part.includes('\uFFFD'))).toBe(true)
 })
 
-it('sends every part of a silent receipt quietly while leaving ordinary replies unchanged', async () => {
+it('defaults to silent delivery and notifies only on the last part of an explicitly audible answer', async () => {
   const params: Record<string, unknown>[] = []
   const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
     params.push(JSON.parse(String(init?.body)))
@@ -86,5 +86,24 @@ it('sends every part of a silent receipt quietly while leaving ordinary replies 
   expect(params.length).toBeGreaterThan(1)
   expect(params.every((part) => part.disable_notification === true)).toBe(true)
   await client.text(42, 101, 'Answer')
-  expect(params.at(-1)?.disable_notification).toBeUndefined()
+  expect(params.at(-1)?.disable_notification).toBe(true)
+  params.length = 0
+  await client.text(42, 101, 'Final answer '.repeat(1000), undefined, undefined, { silent: false })
+  expect(params.slice(0, -1).every((part) => part.disable_notification === true)).toBe(true)
+  expect(params.at(-1)?.disable_notification).toBe(false)
+})
+
+it('sends documents silently unless the final answer explicitly requests a notification', async () => {
+  const forms: FormData[] = []
+  const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+    if (init?.body instanceof FormData) {
+      forms.push(init.body)
+    }
+    return Response.json({ ok: true, result: true })
+  })
+  const client = new TelegramBotClient('token', fetcher, 0)
+  const signal = new AbortController().signal
+  await client.document(42, 101, new Uint8Array([1]), 'result.txt', signal)
+  await client.document(42, 101, new Uint8Array([1]), 'result.txt', signal, { silent: false })
+  expect(forms.map((form) => form.get('disable_notification'))).toEqual(['true', 'false'])
 })

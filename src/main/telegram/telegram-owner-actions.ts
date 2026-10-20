@@ -123,6 +123,8 @@ export async function routeOwnerAction(
       ...(action.optionId !== undefined ? { optionId: action.optionId } : {}),
       ...(action.answers ? { answers: action.answers } : {})
     })
+    ctx.request(action.sessionId, true)
+    await ctx.state.save()
     await ctx.text(threadId, 'Ответ передан агенту.')
   } else if (action.kind === 'question') {
     await deliverTelegramQuestion(ctx, action, messageId)

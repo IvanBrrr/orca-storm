@@ -127,6 +127,8 @@ export async function deliverTelegramQuestion(
           answers
         }
       )
+      ctx.request(action.sessionId, true)
+      await ctx.state.save()
       await ctx.text(topic.threadId, 'Ответ передан агенту.')
       return
     }
@@ -223,5 +225,7 @@ export async function answerTelegramQuestionText(
       answers
     }
   )
+  ctx.request(action.sessionId, true)
+  await ctx.state.save()
   await ctx.text(ctx.state.data.topics[action.sessionId]?.threadId, 'Ответ передан агенту.')
 }
