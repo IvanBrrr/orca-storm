@@ -14,6 +14,7 @@ import { sendTelegramSessionMessage } from './telegram-session-input'
 import { cancelTelegramTextPrompt } from './telegram-navigation-input'
 import { showTelegramSessions } from './telegram-session-catalog'
 import { saveTelegramNavigationDraft } from './telegram-navigation-draft'
+import { telegramTopicOpenedAt } from './telegram-topic-retention'
 
 export async function routeTelegramUpdate(
   ctx: TelegramSessionContext,
@@ -43,6 +44,7 @@ async function routeTelegramUpdateExclusive(
     ) {
       if (ctx.state.data.ownerId !== message.from.id) {
         ctx.state.data.topics = {}
+        ctx.state.data.retiredThreads = {}
         ctx.state.data.actions = {}
         ctx.state.data.replies = {}
         ctx.state.data.replySessions = []
@@ -83,11 +85,19 @@ async function routeTelegramUpdateExclusive(
   const key = callback.data ?? ''
   const stored = ctx.state.data.actions[key]
   const threadId = callback.message.message_thread_id
+  const retired = threadId && ctx.state.data.retiredThreads[String(threadId)]
+  const deleting = Object.values(ctx.state.data.topics).some(
+    (topic) => topic.threadId === threadId && topic.deleting
+  )
   if (!stored || stored.expiresAt < Date.now() || stored.used || stored.threadId !== threadId) {
     await ctx.text(
-      threadId,
+      retired || deleting ? undefined : threadId,
       'Эта кнопка уже использована или устарела. /status показывает текущее состояние.'
     )
+    return
+  }
+  if (deleting) {
+    await ctx.text(undefined, 'Тема удаляется из последних десяти. Открой сессию через /sessions.')
     return
   }
   await routeOwnerAction(
@@ -115,46 +125,70 @@ async function routeOwnerMessage(
   updateId: number
 ): Promise<void> {
   const threadId = message.message_thread_id
+  const retired = threadId && ctx.state.data.retiredThreads[String(threadId)]
+  if (retired && retired.expiresAt < Date.now()) {
+    delete ctx.state.data.retiredThreads[String(threadId)]
+  }
+  const deleting = Object.values(ctx.state.data.topics).some(
+    (topic) => topic.threadId === threadId && topic.deleting
+  )
+  const responseThread =
+    (retired && retired.expiresAt >= Date.now()) || deleting ? undefined : threadId
   const command = message.text?.split(/\s/)[0]?.split('@')[0]
   if (command === '/new' || command === '/cancel') {
     cancelTelegramTextPrompt(ctx, threadId)
     await ctx.state.save()
     if (command === '/cancel') {
-      await showTelegramSessions(ctx, threadId)
+      await showTelegramSessions(ctx, responseThread)
       return
     }
-    await showTelegramWorkspaces(ctx, threadId)
+    await showTelegramWorkspaces(ctx, responseThread)
     return
   }
-  if (await answerTelegramWorktreeName(ctx, message, updateId)) {
+  if (responseThread === threadId && (await answerTelegramWorktreeName(ctx, message, updateId))) {
     return
   }
   if (command === '/start' || command === '/sessions' || command === '/help') {
     cancelTelegramTextPrompt(ctx, threadId)
-    await showTelegramSessions(ctx, threadId)
+    await showTelegramSessions(ctx, responseThread)
     return
   }
   await ctx.refresh()
-  const session = ctx.sessionForThread(threadId)
+  const bound = ctx.sessionForThread(threadId)
+  const topic = bound && ctx.state.data.topics[bound.id]
+  const session = topic?.deleting ? undefined : bound
+  if (topic && !topic.deleting) {
+    topic.lastOpenedAt = telegramTopicOpenedAt(ctx)
+    await ctx.state.save()
+  }
   if (!session || !threadId) {
-    const binding = Object.entries(ctx.state.data.topics).find(
+    const active = Object.entries(ctx.state.data.topics).find(
       ([, topic]) => topic.threadId === threadId
     )
+    const previous = retired && retired.expiresAt >= Date.now() ? retired : undefined
+    const binding =
+      active ?? (previous ? ([previous.sessionId, { name: previous.name }] as const) : undefined)
+    const replyThread = previous || topic?.deleting ? undefined : threadId
     const draftKey = command?.startsWith('/')
       ? undefined
       : await saveTelegramNavigationDraft(ctx, message, updateId, binding?.[0])
+    if (draftKey && threadId && !replyThread) {
+      ctx.state.data.actions[draftKey]!.threadId = undefined
+    }
     if (binding) {
       await ctx.menu(
-        threadId,
+        replyThread,
         undefined,
-        `Эта тема связана с сессией «${binding[1].name}». Сейчас Storca не может подтвердить её доступность.${draftKey ? '\n\nСообщение сохранено для этой сессии. Проверь связь с её хостом или открой сессию в Storca, затем нажми кнопку.' : ''}`,
+        previous || topic?.deleting
+          ? `Тема «${binding[1].name}» убрана из последних десяти.${draftKey ? '\n\nСообщение сохранено для этой сессии. Открой её кнопкой, чтобы передать задачу.' : ''}`
+          : `Эта тема связана с сессией «${binding[1].name}». Сейчас Storca не может подтвердить её доступность.${draftKey ? '\n\nСообщение сохранено для этой сессии. Проверь связь с её хостом или открой сессию в Storca, затем нажми кнопку.' : ''}`,
         {
           inline_keyboard: [
             [
               ctx.button(
                 draftKey ? 'Повторить в этой сессии' : 'Проверить сессию',
                 { kind: 'session-open', sessionId: binding[0], draftKey },
-                threadId
+                replyThread
               )
             ]
           ]

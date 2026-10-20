@@ -107,6 +107,8 @@ const Topic = z.object({
   seen: z.array(z.string()).default([]),
   historyDelivered: z.boolean().optional(),
   notifyReply: z.boolean().optional(),
+  lastOpenedAt: z.number().optional(),
+  deleting: z.boolean().optional(),
   progress: z
     .object({
       key: z.string(),
@@ -133,6 +135,16 @@ const State = z.object({
   notificationsEnabled: z.boolean().default(true),
   pairing: z.object({ hash: z.string(), expiresAt: z.number() }).nullable().default(null),
   topics: z.record(z.string(), Topic).default({}),
+  retiredThreads: z
+    .record(
+      z.string(),
+      z.object({
+        sessionId: z.string(),
+        name: z.string(),
+        expiresAt: z.number()
+      })
+    )
+    .default({}),
   replySessions: z.array(z.string()).default([]),
   operations: z.record(z.string(), z.object({ id: z.string(), expiresAt: z.number() })).default({}),
   actions: z

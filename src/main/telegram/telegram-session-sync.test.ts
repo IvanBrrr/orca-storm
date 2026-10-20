@@ -101,7 +101,7 @@ it('always answers Telegram-initiated turns and waits for streamed prose to sett
   expect(h.sent.filter((entry) => entry.params.text === 'finished')).toHaveLength(1)
 })
 
-it('retains the topic on close and suppresses subsequent messages', async () => {
+it('removes a closed session topic and suppresses subsequent messages', async () => {
   const h = await telegramTestFixture()
   h.setAway(true)
   await syncTelegramSessions(h.ctx)
@@ -114,11 +114,9 @@ it('retains the topic on close and suppresses subsequent messages', async () => 
     })
   ])
   await syncTelegramSessions(h.ctx)
-  expect(h.state.data.topics['session-1']?.closed).toBe(true)
+  expect(h.state.data.topics['session-1']).toBeUndefined()
   expect(h.sent.some((entry) => entry.params.text === 'closed response')).toBe(false)
-  expect(
-    h.sent.filter((entry) => String(entry.params.text).startsWith('Сессия закрыта'))
-  ).toHaveLength(1)
+  expect(h.sent.filter((entry) => entry.method === 'deleteForumTopic')).toHaveLength(1)
 })
 
 it('recreates a deleted topic without resetting its delivery baseline', async () => {

@@ -107,3 +107,37 @@ it('sends documents silently unless the final answer explicitly requests a notif
   await client.document(42, 101, new Uint8Array([1]), 'result.txt', signal, { silent: false })
   expect(forms.map((form) => form.get('disable_notification'))).toEqual(['true', 'false'])
 })
+
+it('deletes only the specified topic and requires Telegram to confirm success', async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => Response.json({ ok: true, result: true }))
+  const client = new TelegramBotClient('token', fetcher, 0)
+  const signal = new AbortController().signal
+  await expect(client.deleteTopic(42, 101, signal)).resolves.toBe(true)
+  const [url, init] = fetcher.mock.calls[0]!
+  expect(String(url).endsWith('/deleteForumTopic')).toBe(true)
+  expect(JSON.parse(String(init?.body))).toEqual({ chat_id: 42, message_thread_id: 101 })
+  fetcher.mockResolvedValueOnce(Response.json({ ok: true, result: false }))
+  await expect(client.deleteTopic(42, 101, signal)).rejects.toThrow()
+  fetcher.mockResolvedValueOnce(
+    Response.json(
+      {
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: TOPIC_ID_INVALID'
+      },
+      { status: 400 }
+    )
+  )
+  await expect(client.deleteTopic(42, 101, signal)).rejects.toMatchObject({ topicMissing: true })
+  fetcher.mockResolvedValueOnce(
+    Response.json(
+      {
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: not enough rights'
+      },
+      { status: 400 }
+    )
+  )
+  await expect(client.deleteTopic(42, 101, signal)).rejects.toMatchObject({ topicMissing: false })
+})

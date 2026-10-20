@@ -48,6 +48,7 @@ export class TelegramBotClient {
     if (
       method === 'sendMessage' ||
       method === 'createForumTopic' ||
+      method === 'deleteForumTopic' ||
       method === 'editForumTopic' ||
       method === 'editMessageText'
     ) {
@@ -80,7 +81,9 @@ export class TelegramBotClient {
       throw new TelegramApiError(
         envelope.error_code ?? response.status,
         envelope.parameters?.retry_after,
-        /message thread not found|message_thread_not_found/i.test(envelope.description ?? ''),
+        /message thread not found|message_thread_not_found|topic_id_invalid|topic_not_found/i.test(
+          envelope.description ?? ''
+        ),
         /message to edit not found|message_id_invalid/i.test(envelope.description ?? ''),
         /message is not modified/i.test(envelope.description ?? '')
       )
@@ -112,6 +115,14 @@ export class TelegramBotClient {
       'editForumTopic',
       { chat_id: chatId, message_thread_id: threadId, name },
       z.boolean(),
+      signal
+    )
+  }
+  deleteTopic(chatId: number, threadId: number, signal: AbortSignal) {
+    return this.call(
+      'deleteForumTopic',
+      { chat_id: chatId, message_thread_id: threadId },
+      z.literal(true),
       signal
     )
   }

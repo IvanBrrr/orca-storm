@@ -1,3 +1,5 @@
+import { createTelegramSessionTopic } from './telegram-topic-creation'
+import { reserveTelegramTopic, telegramTopicOpenedAt } from './telegram-topic-retention'
 import type { TelegramReplyMarkup, TelegramKeyboard } from './telegram-bot-schema'
 import type { TelegramBotClient } from './telegram-bot-client'
 import { TelegramApiError } from './telegram-bot-client'
@@ -21,7 +23,7 @@ export class TelegramSessionContext {
   readonly sessions = new Map<string, TelegramSession>()
   readonly requested = new Set<string>()
   readonly pollingStartedAt = Date.now()
-  private readonly creatingTopics = new Map<string, Promise<TelegramTopic>>()
+  private topicSerial: Promise<unknown> = Promise.resolve()
   private serial: Promise<unknown> = Promise.resolve()
   wasAway = false
 
@@ -34,12 +36,19 @@ export class TelegramSessionContext {
   ) {
     for (const sessionId of state.data.replySessions) {
       this.requested.add(sessionId)
+      const topic = state.data.topics[sessionId]
+      if (topic) {
+        topic.lastOpenedAt ??= Date.now()
+      }
     }
   }
   request(sessionId: string, notifyReply = false): void {
     this.requested.add(sessionId)
     this.state.data.replySessions = [...this.requested]
     const topic = this.state.data.topics[sessionId]
+    if (topic) {
+      topic.lastOpenedAt = telegramTopicOpenedAt(this)
+    }
     if (topic && notifyReply) {
       topic.notifyReply = true
     }
@@ -163,6 +172,9 @@ export class TelegramSessionContext {
       throw new Error('Тема сессии больше недоступна.')
     }
     const topic = entry[1]
+    if (topic.deleting) {
+      throw new Error('Тема удаляется. Открой сессию заново через /sessions.')
+    }
     const result = await this.client.topic(owner, topic.name, this.signal)
     topic.threadId = result.message_thread_id
     await this.state.save()
@@ -179,9 +191,25 @@ export class TelegramSessionContext {
       callback_data: this.state.action(action, threadId, identity)
     }
   }
-  async topic(session: TelegramSession): Promise<TelegramTopic> {
+  topic(session: TelegramSession, automatic = false): Promise<TelegramTopic> {
+    const task = this.topicSerial.catch(() => {}).then(() => this.openTopic(session, automatic))
+    this.topicSerial = task
+    return task
+  }
+  private async openTopic(session: TelegramSession, automatic: boolean): Promise<TelegramTopic> {
+    if (
+      !automatic ||
+      !this.state.data.topics[session.id] ||
+      this.state.data.topics[session.id]?.deleting
+    ) {
+      await reserveTelegramTopic(this, session.id)
+    }
     const existing = this.state.data.topics[session.id]
     if (existing) {
+      if (!automatic) {
+        existing.lastOpenedAt = telegramTopicOpenedAt(this)
+        await this.state.save()
+      }
       const name = telegramTopicName(session)
       const owner = this.state.data.ownerId
       if (owner && session.visible && existing.name !== name) {
@@ -199,68 +227,7 @@ export class TelegramSessionContext {
       }
       return existing
     }
-    const pending = this.creatingTopics.get(session.id)
-    if (pending) {
-      return pending
-    }
-    const create = this.createTopic(session)
-    this.creatingTopics.set(session.id, create)
-    try {
-      return await create
-    } finally {
-      this.creatingTopics.delete(session.id)
-    }
-  }
-  private async createTopic(session: TelegramSession): Promise<TelegramTopic> {
-    const owner = this.state.data.ownerId
-    if (!owner) {
-      throw new Error('Telegram ещё не привязан к владельцу.')
-    }
-    const name = telegramTopicName(session)
-    const history = session.agent === 'codex' ? await this.port.history(session.id) : []
-    const result = await this.client.topic(owner, name, this.signal)
-    const topic: TelegramTopic = {
-      threadId: result.message_thread_id,
-      name,
-      closed: !session.visible,
-      seen: history
-        .filter(
-          (item) =>
-            item.body.kind === 'message' &&
-            item.body.role === 'assistant' &&
-            item.body.state !== 'running'
-        )
-        .map((item) => `message:${item.itemId}`),
-      lastUpdated: session.updatedAt
-    }
-    if (session.status?.turnOutcome) {
-      this.remember(
-        topic,
-        `outcome:${session.status.statusStartedAt ?? session.status.updatedAt}:${session.status.turnOutcome}`
-      )
-    }
-    this.state.data.topics[session.id] = topic
-    await this.state.save()
-    const keyboard = {
-      inline_keyboard: [
-        [
-          this.button('Статус', { kind: 'status', sessionId: session.id }, topic.threadId),
-          this.button('Остановить', { kind: 'stop', sessionId: session.id }, topic.threadId)
-        ],
-        [
-          this.button('Все сессии', { kind: 'sessions', page: 0 }, topic.threadId),
-          this.button('Новая сессия', { kind: 'workspaces', page: 0 }, topic.threadId)
-        ]
-      ]
-    }
-    await this.state.save()
-    await this.text(
-      topic.threadId,
-      `Сессия Storca: ${name}\nАгент: ${session.agent}\n${session.agent === 'codex' ? 'Пиши сюда, чтобы продолжить разговор.' : 'Переписка через Telegram пока поддерживается для Codex.'}${session.source === 'terminal' ? '\nЗапросы разрешений в терминальных сессиях пока нужно подтверждать в Storca.' : ''} /new создаёт новую сессию.`,
-      keyboard,
-      { silent: true }
-    )
-    return topic
+    return createTelegramSessionTopic(this, session, automatic)
   }
   sessionForThread(threadId: number | undefined): TelegramSession | undefined {
     if (!threadId) {

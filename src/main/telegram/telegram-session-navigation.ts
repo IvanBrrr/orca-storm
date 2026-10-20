@@ -48,13 +48,18 @@ export async function routeTelegramSessionNavigation(
     }
   }
   if (threadId !== topic.threadId) {
+    const sourceThread =
+      threadId &&
+      Object.values(ctx.state.data.topics).some((source) => source.threadId === threadId)
+        ? threadId
+        : undefined
     await ctx.menu(
-      threadId,
-      messageId,
+      sourceThread,
+      threadId && !sourceThread ? undefined : messageId,
       `Продолжение в теме «${topic.name}». Открой её в списке тем.`,
       {
         inline_keyboard: [
-          [ctx.button('Выбрать другую сессию', { kind: 'sessions', page: 0 }, threadId)]
+          [ctx.button('Выбрать другую сессию', { kind: 'sessions', page: 0 }, sourceThread)]
         ]
       }
     )

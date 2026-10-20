@@ -5,9 +5,7 @@ import type { TelegramTopic } from './telegram-integration-state'
 import { deliverTelegramSessionHistory } from './telegram-session-history'
 import { syncTelegramSessionProgress } from './telegram-session-progress'
 import { isRootAgentJournalItem } from '../../shared/agent-session-journal-producer'
-import { recentTelegramSessions } from './telegram-session-order'
-
-const AUTOMATIC_SESSION_LIMIT = 10
+import { removeExcessTelegramTopic, retainedTelegramSessionIds } from './telegram-topic-retention'
 
 function completedMessage(item: AgentJournalRenderItem): boolean {
   return (
@@ -22,18 +20,22 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
   if (!ctx.state.data.ownerId) {
     return
   }
-  const automaticSessions = await ctx.exclusive(async () => {
-    await ctx.refresh()
-    return new Set(
-      recentTelegramSessions(ctx.sessions.values())
-        .slice(0, AUTOMATIC_SESSION_LIMIT)
-        .map((session) => session.id)
-    )
-  })
+  await ctx.exclusive(() => ctx.refresh())
+  let firstError: unknown
+  let cleanupFailed = false
+  for (const id of Object.keys(ctx.state.data.topics)) {
+    try {
+      await ctx.exclusive(() => removeExcessTelegramTopic(ctx, id))
+    } catch (error) {
+      ctx.signal.throwIfAborted()
+      firstError = error
+      cleanupFailed = true
+      break
+    }
+  }
   const away = ctx.isAway() !== false
   const becameAway = away && !ctx.wasAway
   ctx.wasAway = away
-  let firstError: unknown
   for (const sessionId of ctx.sessions.keys()) {
     try {
       await ctx.exclusive(async () => {
@@ -41,10 +43,16 @@ export async function syncTelegramSessions(ctx: TelegramSessionContext): Promise
         if (!session || (!session.visible && !ctx.state.data.topics[sessionId])) {
           return
         }
-        if (session.visible && !automaticSessions.has(sessionId) && !ctx.requested.has(sessionId)) {
+        if (!retainedTelegramSessionIds(ctx).has(sessionId) && !ctx.requested.has(sessionId)) {
           return
         }
-        const topic = await ctx.topic(session)
+        if (
+          cleanupFailed &&
+          (!ctx.state.data.topics[sessionId] || ctx.state.data.topics[sessionId]?.deleting)
+        ) {
+          return
+        }
+        const topic = await ctx.topic(session, true)
         if (topic.closed !== !session.visible) {
           topic.closed = !session.visible
           await ctx.state.save()

@@ -40,10 +40,11 @@ it('automatically creates only the ten most recent topics across workspaces and 
   const nextHistory = history.mock.calls.length
   await syncTelegramSessions(h.ctx)
   expect(history.mock.calls.slice(nextHistory).some(([id]) => id === 'session-40')).toBe(false)
-  expect(h.state.data.topics['session-40']).toBeDefined()
+  expect(h.state.data.topics['session-40']).toBeUndefined()
+  expect(Object.keys(h.state.data.topics)).toHaveLength(10)
 })
 
-it('keeps existing older bindings quiet without reading history or progress, but delivers requested replies', async () => {
+it('deletes older topics without reading their histories and keeps a requested reply until delivery', async () => {
   const h = await manySessions()
   for (const [index, session] of h.sessions.entries()) {
     session.status = {
@@ -64,15 +65,21 @@ it('keeps existing older bindings quiet without reading history or progress, but
   }
   await h.state.save()
   await h.state.load()
+  h.ctx.request('session-0', true)
   const history = vi.spyOn(h.port, 'history')
   const progress = vi.fn(async (_id: string) => ({ key: 'turn', start: '', lines: [] }))
   h.port.progress = progress
   h.setAway(true)
   await syncTelegramSessions(h.ctx)
-  expect(history.mock.calls.every(([id]) => Number(id.split('-')[1]) >= 40)).toBe(true)
+  expect(
+    history.mock.calls.every(([id]) => id === 'session-0' || Number(id.split('-')[1]) >= 41)
+  ).toBe(true)
   expect(progress.mock.calls).toHaveLength(10)
-  expect(progress.mock.calls.every(([id]) => Number(id.split('-')[1]) >= 40)).toBe(true)
-  expect(h.sent.some((entry) => entry.params.message_thread_id === 1000)).toBe(false)
+  expect(
+    progress.mock.calls.every(([id]) => id === 'session-0' || Number(id.split('-')[1]) >= 41)
+  ).toBe(true)
+  expect(h.sent.filter((entry) => entry.method === 'deleteForumTopic')).toHaveLength(41)
+  expect(Object.keys(h.state.data.topics)).toHaveLength(10)
   expect(h.ctx.sessionForThread(1000)?.id).toBe('session-0')
 
   const session = h.sessions[0]!
@@ -85,6 +92,7 @@ it('keeps existing older bindings quiet without reading history or progress, but
     updatedAt: 1
   }
   h.ctx.request(session.id, true)
+  h.sent.length = 0
   h.setItems([
     telegramTestItem({
       kind: 'message',
@@ -103,6 +111,8 @@ it('keeps existing older bindings quiet without reading history or progress, but
     })
   ])
   expect(h.ctx.requested.has(session.id)).toBe(false)
+  await syncTelegramSessions(h.ctx)
+  expect(h.state.data.topics[session.id]).toBeDefined()
   expect(h.sent.some((entry) => entry.method === 'createForumTopic')).toBe(false)
 })
 
